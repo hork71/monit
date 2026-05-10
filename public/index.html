@@ -10,28 +10,31 @@
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <style>
     :root {
-      --bg:            #07090f;
-      --surface:       #0c1320;
-      --border:        rgba(80, 130, 200, 0.10);
-      --text-dim:      #3d5878;
-      --text:          #7a9dc0;
-      --text-bright:   #b8d4ee;
+      --bg:          #f6f3ec;
+      --surface:     #ffffff;
+      --border:      rgba(38, 52, 68, 0.09);
+      --shadow-sm:   rgba(38, 52, 68, 0.10);
+      --shadow-md:   rgba(38, 52, 68, 0.14);
+      --text:        #263444;
+      --text-muted:  #7a93a8;
+      --text-dim:    #afc0ce;
 
-      --green:         #06d6a0;
-      --green-fill:    rgba(6,  214, 160, 0.10);
-      --green-glow:    rgba(6,  214, 160, 0.30);
+      --green:       #1e9e5e;
+      --green-fill:  rgba(30, 158, 94,  0.10);
+      --green-halo:  rgba(30, 158, 94,  0.07);
+      --red:         #d4243a;
+      --red-fill:    rgba(212, 36,  58,  0.10);
+      --red-halo:    rgba(212, 36,  58,  0.07);
 
-      --red:           #ef233c;
-      --red-fill:      rgba(239,  35,  60, 0.10);
-      --red-glow:      rgba(239,  35,  60, 0.30);
+      --cebo-bg:     #263444;
+      --cebo-fg:     #f6f3ec;
 
-      --puppet:        #00b4d8;
-      --puppet-fill:   rgba(0,  180, 216, 0.06);
-      --puppet-stroke: rgba(0,  180, 216, 0.40);
-
-      --gitlab:        #e85d04;
-      --gitlab-fill:   rgba(232,  93,   4, 0.06);
-      --gitlab-stroke: rgba(232,  93,   4, 0.40);
+      --puppet:      #1565a0;
+      --puppet-lt:   rgba(21, 101, 160, 0.09);
+      --gitlab:      #b84400;
+      --gitlab-lt:   rgba(184, 68,  0,   0.09);
+      --suma:        #286b50;
+      --suma-lt:     rgba(40, 107, 80,  0.09);
 
       --font-display: 'Syne', sans-serif;
       --font-mono:    'JetBrains Mono', monospace;
@@ -48,85 +51,55 @@
       flex-direction: column;
     }
 
-    /* ── Background layers ─────────────────────────────────────────────────── */
+    /* ── Background texture ──────────────────────────────────────────────────── */
 
-    .bg-grid {
+    .dot-grid {
       position: fixed; inset: 0;
-      background-image: radial-gradient(circle, rgba(80,130,200,0.07) 1px, transparent 1px);
-      background-size: 32px 32px;
+      background-image: radial-gradient(circle, rgba(38,52,68,0.07) 1px, transparent 1px);
+      background-size: 26px 26px;
       pointer-events: none;
       z-index: 0;
     }
 
-    .radar-sweep {
-      position: fixed; inset: 0;
-      pointer-events: none;
-      z-index: 0;
-      animation: sweep 9s linear infinite;
-      transform-origin: 50% 50%;
-      background: conic-gradient(from 0deg at 50% 50%,
-        transparent 340deg,
-        rgba(0, 180, 216, 0.05) 353deg,
-        rgba(0, 180, 216, 0.01) 360deg
-      );
-    }
-
-    @keyframes sweep { to { transform: rotate(360deg); } }
-
-    .scanlines {
-      position: fixed; inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent, transparent 3px,
-        rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 4px
-      );
-      pointer-events: none;
-      z-index: 900;
-    }
-
-    /* ── Header ────────────────────────────────────────────────────────────── */
+    /* ── Header ──────────────────────────────────────────────────────────────── */
 
     header {
       position: relative;
       z-index: 10;
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 13px 28px;
+      padding: 12px 28px;
+      background: var(--surface);
       border-bottom: 1px solid var(--border);
-      background: rgba(7, 9, 15, 0.88);
-      backdrop-filter: blur(12px);
-      flex-shrink: 0;
+      box-shadow:
+        0 1px 0 rgba(38,52,68,0.05),
+        0 2px 16px rgba(38,52,68,0.07);
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 13px;
     }
 
-    .brand-icon {
-      width: 34px; height: 34px;
-      flex-shrink: 0;
-    }
+    .brand-icon { width: 32px; height: 32px; flex-shrink: 0; }
 
     .brand-name {
       font-family: var(--font-display);
-      font-size: 21px;
+      font-size: 20px;
       font-weight: 800;
       letter-spacing: -0.04em;
-      color: var(--text-bright);
+      color: var(--text);
       line-height: 1;
     }
 
-    .brand-name em {
-      color: var(--puppet);
-      font-style: normal;
-    }
+    .brand-name em { color: var(--puppet); font-style: normal; }
 
     .brand-sub {
-      font-size: 8.5px;
-      letter-spacing: 0.20em;
+      font-size: 8px;
+      letter-spacing: 0.18em;
       text-transform: uppercase;
       color: var(--text-dim);
       margin-top: 3px;
@@ -135,69 +108,67 @@
     .header-right {
       display: flex;
       align-items: center;
-      gap: 28px;
+      gap: 22px;
     }
 
     .stat {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 3px;
+      gap: 2px;
     }
 
     .stat-label {
-      font-size: 8px;
-      letter-spacing: 0.18em;
+      font-size: 7.5px;
+      letter-spacing: 0.17em;
       text-transform: uppercase;
       color: var(--text-dim);
     }
 
     .stat-val {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
-      color: var(--text-bright);
-      letter-spacing: 0.02em;
+      color: var(--text);
     }
 
     .stat-val.puppet { color: var(--puppet); }
     .stat-val.gitlab { color: var(--gitlab); }
+    .stat-val.suma   { color: var(--suma);   }
 
     .hdivider {
       width: 1px;
-      height: 30px;
+      height: 26px;
       background: var(--border);
     }
 
     .conn {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 9.5px;
+      gap: 7px;
+      font-size: 9px;
       letter-spacing: 0.12em;
       text-transform: uppercase;
+      color: var(--text-muted);
     }
 
     .conn-dot {
       width: 7px; height: 7px;
       border-radius: 50%;
       background: var(--green);
-      box-shadow: 0 0 10px var(--green-glow);
+      box-shadow: 0 0 0 3px rgba(30,158,94,0.18);
       flex-shrink: 0;
-      transition: background 0.35s, box-shadow 0.35s;
+      transition: background 0.3s, box-shadow 0.3s;
     }
 
     .conn-dot.off {
       background: var(--red);
-      box-shadow: 0 0 10px var(--red-glow);
+      box-shadow: 0 0 0 3px rgba(212,36,58,0.18);
       animation: blink 1.1s ease-in-out infinite;
     }
 
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.25; }
-    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 
-    /* ── Main / SVG ────────────────────────────────────────────────────────── */
+    /* ── Main / SVG ──────────────────────────────────────────────────────────── */
 
     main {
       flex: 1;
@@ -206,9 +177,15 @@
       overflow: hidden;
     }
 
-    #chart { width: 100%; height: 100%; display: block; }
+    #chart {
+      width: 100%; height: 100%;
+      display: block;
+      cursor: grab;
+    }
 
-    /* ── Loading overlay ───────────────────────────────────────────────────── */
+    #chart:active { cursor: grabbing; }
+
+    /* ── Loading overlay ─────────────────────────────────────────────────────── */
 
     .loading {
       position: absolute; inset: 0;
@@ -216,17 +193,17 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 18px;
+      gap: 16px;
       z-index: 50;
-      transition: opacity 0.5s ease;
       background: var(--bg);
+      transition: opacity 0.5s ease;
     }
 
     .loading.hidden { opacity: 0; pointer-events: none; }
 
     .loading-ring {
-      width: 52px; height: 52px;
-      border: 2px solid rgba(0, 180, 216, 0.12);
+      width: 46px; height: 46px;
+      border: 2px solid var(--border);
       border-top-color: var(--puppet);
       border-radius: 50%;
       animation: spin 1.1s linear infinite;
@@ -235,48 +212,58 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .loading-text {
-      font-size: 10px;
-      letter-spacing: 0.22em;
+      font-size: 9.5px;
+      letter-spacing: 0.20em;
       text-transform: uppercase;
       color: var(--text-dim);
     }
 
-    /* ── Legend ────────────────────────────────────────────────────────────── */
+    /* ── Legend ──────────────────────────────────────────────────────────────── */
 
     .legend {
       position: absolute;
-      bottom: 18px;
+      bottom: 16px;
       left: 50%;
       transform: translateX(-50%);
       display: flex;
-      gap: 22px;
+      gap: 18px;
       align-items: center;
-      padding: 8px 20px;
-      background: rgba(12, 19, 32, 0.88);
+      padding: 7px 18px;
+      background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 2px;
-      backdrop-filter: blur(10px);
+      border-radius: 3px;
+      box-shadow:
+        0 2px 6px var(--shadow-sm),
+        0 1px 2px var(--shadow-md);
       z-index: 20;
       white-space: nowrap;
+    }
+
+    .legend-sep {
+      width: 1px;
+      height: 14px;
+      background: var(--border);
+      margin: 0 2px;
     }
 
     .legend-item {
       display: flex;
       align-items: center;
-      gap: 7px;
-      font-size: 8.5px;
-      letter-spacing: 0.13em;
+      gap: 6px;
+      font-size: 8px;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: var(--text-dim);
+      color: var(--text-muted);
     }
 
     .pip {
-      width: 8px; height: 8px;
+      width: 9px; height: 9px;
       border-radius: 50%;
       flex-shrink: 0;
+      border: 2px solid transparent;
     }
 
-    /* ── Tooltip ───────────────────────────────────────────────────────────── */
+    /* ── Tooltip ─────────────────────────────────────────────────────────────── */
 
     #tooltip {
       position: fixed;
@@ -284,12 +271,14 @@
       z-index: 999;
       opacity: 0;
       transition: opacity 0.12s;
-      background: rgba(12, 19, 32, 0.96);
-      border: 1px solid rgba(80, 130, 200, 0.18);
-      border-radius: 3px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
       padding: 10px 14px;
-      backdrop-filter: blur(12px);
-      min-width: 140px;
+      box-shadow:
+        0 4px 12px var(--shadow-sm),
+        0 1px 4px var(--shadow-md);
+      min-width: 155px;
     }
 
     #tooltip.show { opacity: 1; }
@@ -298,68 +287,65 @@
       font-family: var(--font-display);
       font-size: 14px;
       font-weight: 700;
-      color: var(--text-bright);
-      margin-bottom: 3px;
+      color: var(--text);
       line-height: 1;
+      margin-bottom: 3px;
+    }
+
+    .tt-group {
+      font-size: 8.5px;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 7px;
     }
 
     .tt-node {
       font-size: 10px;
-      color: var(--text);
-      margin-bottom: 2px;
+      color: var(--text-muted);
       font-style: italic;
-      letter-spacing: 0.01em;
+      margin-bottom: 2px;
     }
 
     .tt-port {
-      font-size: 10.5px;
+      font-size: 10px;
       color: var(--text-dim);
       margin-bottom: 8px;
     }
 
     .tt-status {
-      font-size: 9.5px;
+      font-size: 9px;
       font-weight: 600;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.10em;
       text-transform: uppercase;
     }
 
     .tt-status.up   { color: var(--green); }
     .tt-status.down { color: var(--red);   }
 
-    /* ── SVG circle animations ─────────────────────────────────────────────── */
+    /* ── SVG node animations ─────────────────────────────────────────────────── */
 
     @keyframes pulse-down {
       0%, 100% { opacity: 1; }
-      50%       { opacity: 0.38; }
+      50%       { opacity: 0.40; }
     }
 
-    @keyframes breathe-up {
-      0%, 100% { opacity: 0.70; }
-      50%       { opacity: 0.25; }
-    }
-
-    .anim-down { animation: pulse-down 1.5s ease-in-out infinite; }
-    .anim-up   { animation: breathe-up 3.2s ease-in-out infinite; }
+    .unavail-pulse { animation: pulse-down 1.6s ease-in-out infinite; }
   </style>
 </head>
 <body>
-  <div class="bg-grid"></div>
-  <div class="radar-sweep"></div>
-  <div class="scanlines"></div>
+  <div class="dot-grid"></div>
 
   <header>
     <div class="brand">
-      <!-- Radar / target icon -->
-      <svg class="brand-icon" viewBox="0 0 34 34" fill="none">
-        <circle cx="17" cy="17" r="15.5" stroke="rgba(0,180,216,0.22)" stroke-width="1"/>
-        <circle cx="17" cy="17" r="10"   stroke="rgba(0,180,216,0.35)" stroke-width="1"/>
-        <circle cx="17" cy="17" r="4.5"  stroke="rgba(0,180,216,0.55)" stroke-width="1"/>
-        <circle cx="17" cy="17" r="2"    fill="#00b4d8"/>
-        <line x1="17" y1="1.5"  x2="17" y2="7"   stroke="#00b4d8" stroke-width="1.4"/>
-        <line x1="17" y1="27"   x2="17" y2="32.5" stroke="rgba(0,180,216,0.25)" stroke-width="1"/>
-        <line x1="1.5" y1="17"  x2="7"   y2="17"  stroke="rgba(0,180,216,0.25)" stroke-width="1"/>
-        <line x1="27"  y1="17"  x2="32.5" y2="17" stroke="rgba(0,180,216,0.25)" stroke-width="1"/>
+      <svg class="brand-icon" viewBox="0 0 32 32" fill="none">
+        <circle cx="16" cy="16" r="14.5" stroke="rgba(38,52,68,0.16)" stroke-width="1"/>
+        <circle cx="16" cy="16" r="9"    stroke="rgba(38,52,68,0.24)" stroke-width="1"/>
+        <circle cx="16" cy="16" r="3.5"  fill="#263444"/>
+        <line x1="16" y1="1.5"  x2="16" y2="7"    stroke="#1565a0" stroke-width="1.5"/>
+        <line x1="16" y1="25"   x2="16" y2="30.5"  stroke="rgba(38,52,68,0.20)" stroke-width="1"/>
+        <line x1="1.5" y1="16"  x2="7"  y2="16"   stroke="rgba(38,52,68,0.20)" stroke-width="1"/>
+        <line x1="25"  y1="16"  x2="30.5" y2="16"  stroke="rgba(38,52,68,0.20)" stroke-width="1"/>
       </svg>
       <div>
         <div class="brand-name">SYS<em>MON</em></div>
@@ -375,6 +361,10 @@
       <div class="stat">
         <span class="stat-label">GitLab</span>
         <span class="stat-val gitlab" id="gitlab-count">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Suma</span>
+        <span class="stat-val suma" id="suma-count">—</span>
       </div>
       <div class="hdivider"></div>
       <div class="stat">
@@ -398,305 +388,127 @@
 
     <div class="loading" id="loading">
       <div class="loading-ring"></div>
-      <div class="loading-text">Running initial diagnostics…</div>
+      <div class="loading-text">Running diagnostics…</div>
     </div>
 
     <div class="legend">
       <div class="legend-item">
-        <div class="pip" style="background:var(--puppet);opacity:.75;"></div>
+        <div class="pip" style="border-color:var(--puppet);background:var(--puppet-lt);"></div>
         Puppet
       </div>
       <div class="legend-item">
-        <div class="pip" style="background:var(--gitlab);opacity:.75;"></div>
+        <div class="pip" style="border-color:var(--gitlab);background:var(--gitlab-lt);"></div>
         GitLab
       </div>
       <div class="legend-item">
-        <div class="pip" style="background:var(--green);box-shadow:0 0 6px var(--green-glow);"></div>
+        <div class="pip" style="border-color:var(--suma);background:var(--suma-lt);"></div>
+        Suma
+      </div>
+      <div class="legend-sep"></div>
+      <div class="legend-item">
+        <div class="pip" style="border-color:var(--green);background:var(--green-fill);"></div>
         Available
       </div>
       <div class="legend-item">
-        <div class="pip" style="background:var(--red);box-shadow:0 0 6px var(--red-glow);"></div>
+        <div class="pip" style="border-color:var(--red);background:var(--red-fill);"></div>
         Unavailable
+      </div>
+      <div class="legend-sep"></div>
+      <div class="legend-item" style="color:var(--text-dim);">
+        drag to reposition
       </div>
     </div>
   </main>
 
   <div id="tooltip">
     <div class="tt-name"   id="tt-name"></div>
+    <div class="tt-group"  id="tt-group"></div>
     <div class="tt-node"   id="tt-node"></div>
     <div class="tt-port"   id="tt-port"></div>
     <div class="tt-status" id="tt-status"></div>
   </div>
 
   <script>
-    // ── Design tokens ────────────────────────────────────────────────────────
-    const C = {
-      green:      '#06d6a0',
-      greenFill:  'rgba(6,214,160,0.10)',
-      greenGlow:  'rgba(6,214,160,0.28)',
-      red:        '#ef233c',
-      redFill:    'rgba(239,35,60,0.10)',
-      redGlow:    'rgba(239,35,60,0.28)',
-      group: {
-        puppet: { fill: 'rgba(0,180,216,0.055)', stroke: 'rgba(0,180,216,0.38)', label: '#00b4d8' },
-        gitlab: { fill: 'rgba(232,93,4,0.055)',  stroke: 'rgba(232,93,4,0.38)',  label: '#e85d04' },
-      },
-      cebo: { fill: 'rgba(201,168,76,0.04)', stroke: 'rgba(201,168,76,0.42)', label: '#d4b870' },
+    // ── Design constants ─────────────────────────────────────────────────────
+    const COLORS = {
+      green:     '#1e9e5e',
+      greenFill: 'rgba(30,158,94,0.10)',
+      greenHalo: 'rgba(30,158,94,0.07)',
+      red:       '#d4243a',
+      redFill:   'rgba(212,36,58,0.10)',
+      redHalo:   'rgba(212,36,58,0.07)',
     };
 
-    // ── State ────────────────────────────────────────────────────────────────
-    let svg, packG;
-    let W = 0, H = 0;
-    let rendered   = false;
-    let lastGroups = null;
+    const GROUP_META = {
+      puppet: { color: '#1565a0', fill: 'rgba(21,101,160,0.09)', name: 'PUPPET' },
+      gitlab: { color: '#b84400', fill: 'rgba(184,68,0,0.09)',   name: 'GITLAB' },
+      suma:   { color: '#286b50', fill: 'rgba(40,107,80,0.09)',  name: 'SUMA'   },
+    };
 
-    // key → { glowEl, circleEl, textEls, available }
-    const svcRefs = new Map();
-
-    // ── Build D3 hierarchy from status groups ────────────────────────────────
-    // root (hidden) → cebo (central) → puppet/gitlab (groups) → services
-    function buildHierarchy(groups) {
-      return {
-        name: 'root',
-        children: [{
-          name: 'cebo',
-          isCebo: true,
-          children: Object.entries(groups).map(([gName, svcs]) => ({
-            name: gName,
-            isGroup: true,
-            children: svcs.map(s => ({ ...s, value: 1 })),
-          })),
-        }],
-      };
+    function getGroupMeta(id) {
+      return GROUP_META[id] || { color: '#4a6080', fill: 'rgba(74,96,128,0.09)', name: id.toUpperCase() };
     }
 
-    // ── Compute circle-pack layout ───────────────────────────────────────────
-    function computePack(groups, w, h) {
-      const root = d3.hierarchy(buildHierarchy(groups)).sum(d => d.value || 0);
-      d3.pack().size([w, h]).padding(n => {
-        if (n.depth === 0) return 20;  // root → cebo
-        if (n.depth === 1) return 36;  // cebo → groups
-        return 18;                     // groups → services
-      })(root);
-      return root;
-    }
+    const R = { root: 44, group: 30, service: 19 };
+    function nodeRadius(d) { return R[d.type] ?? R.service; }
 
-    // ── Full render (first paint) ────────────────────────────────────────────
-    function fullRender(groups) {
-      svcRefs.clear();
-      packG.selectAll('*').remove();
+    // ── Build D3 graph data from WebSocket status groups ─────────────────────
+    // Hierarchy: cebo (root) → group nodes → service nodes
+    function buildGraph(groups) {
+      const nodes = [{ id: 'cebo', type: 'root' }];
+      const links = [];
+      const nodeMap = new Map();
 
-      const root = computePack(groups, W, H);
+      Object.entries(groups).forEach(([gName, services]) => {
+        const meta = getGroupMeta(gName);
+        nodes.push({ id: gName, type: 'group', meta, label: meta.name });
+        links.push({ source: 'cebo', target: gName, linkType: 'root-group' });
 
-      root.descendants().forEach(pn => {
-        if (pn.depth === 0) return;
-
-        const g = packG.append('g')
-          .attr('transform', `translate(${pn.x},${pn.y})`);
-
-        if (pn.depth === 1) {
-          // ── Cebo central circle ───────────────────────────────────────────
-          // Outermost dashed ring
-          g.append('circle')
-            .attr('r', pn.r + 12)
-            .attr('fill', 'none')
-            .attr('stroke', 'rgba(201,168,76,0.15)')
-            .attr('stroke-width', 1)
-            .attr('stroke-dasharray', '3 9');
-
-          // Inner accent ring
-          g.append('circle')
-            .attr('r', pn.r + 4)
-            .attr('fill', 'none')
-            .attr('stroke', 'rgba(201,168,76,0.28)')
-            .attr('stroke-width', 1);
-
-          // Main cebo fill
-          g.append('circle')
-            .attr('r', pn.r)
-            .attr('fill', C.cebo.fill)
-            .attr('stroke', C.cebo.stroke)
-            .attr('stroke-width', 1.5);
-
-          // CEBO label at top of circle
-          const lsz = Math.max(13, Math.min(24, pn.r * 0.07));
-          g.append('text')
-            .attr('y', -pn.r + lsz + 16)
-            .attr('text-anchor', 'middle')
-            .attr('font-family', "'Syne', sans-serif")
-            .attr('font-size', lsz)
-            .attr('font-weight', '800')
-            .attr('letter-spacing', '0.24em')
-            .attr('fill', C.cebo.label)
-            .attr('opacity', 0.88)
-            .text('CEBO');
-
-        } else if (pn.depth === 2) {
-          // ── Group circle (puppet / gitlab) ────────────────────────────────
-          const st = C.group[pn.data.name] || C.group.puppet;
-
-          // Outer decorative ring
-          g.append('circle')
-            .attr('r', pn.r + 8)
-            .attr('fill', 'none')
-            .attr('stroke', st.stroke)
-            .attr('stroke-width', 0.75)
-            .attr('opacity', 0.28);
-
-          // Group fill + border
-          g.append('circle')
-            .attr('r', pn.r)
-            .attr('fill', st.fill)
-            .attr('stroke', st.stroke)
-            .attr('stroke-width', 1.5);
-
-          // Group label
-          const lsz = Math.max(11, Math.min(17, pn.r * 0.10));
-          g.append('text')
-            .attr('y', -pn.r + lsz + 12)
-            .attr('text-anchor', 'middle')
-            .attr('font-family', "'Syne', sans-serif")
-            .attr('font-size', lsz)
-            .attr('font-weight', '800')
-            .attr('letter-spacing', '0.16em')
-            .attr('fill', st.label)
-            .attr('opacity', 0.92)
-            .text(pn.data.name.toUpperCase());
-
-        } else if (pn.depth === 3) {
-          // ── Service circle ────────────────────────────────────────────────
-          const groupName = pn.parent.data.name;
-          const { name, node: hostname, port, available } = pn.data;
-          const key   = `${groupName}:${name}`;
-          const color = available ? C.green : C.red;
-          const fill  = available ? C.greenFill : C.redFill;
-          const glow  = available ? C.greenGlow : C.redGlow;
-
-          // Outer glow halo
-          const glowEl = g.append('circle')
-            .attr('r', pn.r + 5)
-            .attr('fill', glow)
-            .attr('class', available ? 'anim-up' : 'anim-down');
-
-          // Main service circle
-          const circleEl = g.append('circle')
-            .attr('r', pn.r)
-            .attr('fill', fill)
-            .attr('stroke', color)
-            .attr('stroke-width', 1.5);
-
-          if (!available) circleEl.classed('anim-down', true);
-
-          // Center status dot
-          g.append('circle')
-            .attr('r', Math.max(2, pn.r * 0.09))
-            .attr('fill', color)
-            .attr('opacity', 0.85);
-
-          // Text labels
-          const fsz  = Math.max(8, Math.min(12, pn.r * 0.27));
-          const textEls = [];
-
-          if (pn.r > 22) {
-            const hasPort = pn.r > 36;
-            const nameY   = hasPort ? -fsz * 0.65 : 0;
-
-            const nameEl = g.append('text')
-              .attr('y', nameY)
-              .attr('text-anchor', 'middle')
-              .attr('dominant-baseline', 'central')
-              .attr('font-family', "'JetBrains Mono', monospace")
-              .attr('font-size', fsz)
-              .attr('font-weight', '500')
-              .attr('fill', color)
-              .attr('opacity', 0.95)
-              .text(name);
-            textEls.push(nameEl);
-
-            if (hasPort) {
-              const portEl = g.append('text')
-                .attr('y', fsz * 0.90)
-                .attr('text-anchor', 'middle')
-                .attr('dominant-baseline', 'central')
-                .attr('font-family', "'JetBrains Mono', monospace")
-                .attr('font-size', Math.max(7, fsz * 0.70))
-                .attr('fill', color)
-                .attr('opacity', 0.42)
-                .text(`:${port}`);
-              textEls.push(portEl);
-            }
-          }
-
-          // Store reference for incremental color updates
-          svcRefs.set(key, { glowEl, circleEl, textEls, available, hostname });
-
-          // Tooltip interactions
-          const tooltip = document.getElementById('tooltip');
-          g.style('cursor', 'default')
-            .on('mouseenter', () => {
-              const ref = svcRefs.get(key);
-              const av  = ref ? ref.available : available;
-              document.getElementById('tt-name').textContent = name;
-              document.getElementById('tt-node').textContent = ref ? ref.hostname : hostname;
-              document.getElementById('tt-port').textContent = `TCP :${port}`;
-              const statusEl = document.getElementById('tt-status');
-              statusEl.textContent = av ? '● ONLINE' : '● OFFLINE';
-              statusEl.className   = `tt-status ${av ? 'up' : 'down'}`;
-              tooltip.classList.add('show');
-            })
-            .on('mousemove', (ev) => {
-              tooltip.style.left = `${ev.clientX + 16}px`;
-              tooltip.style.top  = `${ev.clientY - 12}px`;
-            })
-            .on('mouseleave', () => tooltip.classList.remove('show'));
-        }
-      });
-    }
-
-    // ── Incremental color update (subsequent status pushes) ──────────────────
-    function updateColors(groups) {
-      Object.entries(groups).forEach(([groupName, svcs]) => {
-        svcs.forEach(({ name, available }) => {
-          const key = `${groupName}:${name}`;
-          const ref = svcRefs.get(key);
-          if (!ref) return;
-
-          ref.available = available;
-
-          const color = available ? C.green : C.red;
-          const fill  = available ? C.greenFill : C.redFill;
-          const glow  = available ? C.greenGlow : C.redGlow;
-
-          ref.glowEl
-            .classed('anim-up',   available)
-            .classed('anim-down', !available)
-            .transition().duration(500).attr('fill', glow);
-
-          ref.circleEl
-            .classed('anim-down', !available)
-            .transition().duration(500)
-            .attr('fill', fill)
-            .attr('stroke', color);
-
-          ref.textEls.forEach(el =>
-            el.transition().duration(500).attr('fill', color)
-          );
+        services.forEach(svc => {
+          const id = `${gName}:${svc.name}`;
+          nodes.push({ id, type: 'service', group: gName, meta, ...svc });
+          links.push({ source: gName, target: id, linkType: 'group-service', groupColor: meta.color });
         });
       });
+
+      nodes.forEach(n => nodeMap.set(n.id, n));
+      return { nodes, links, nodeMap };
     }
 
-    // ── Update header stats display ──────────────────────────────────────────
-    function updateStats(timestamp, groups) {
-      Object.entries(groups).forEach(([group, svcs]) => {
-        const up  = svcs.filter(s => s.available).length;
-        const el  = document.getElementById(`${group}-count`);
-        if (el) el.textContent = `${up} / ${svcs.length}`;
+    // ── Position nodes before simulation starts for a faster, cleaner settle ─
+    function seedPositions(graph) {
+      const cebo = graph.nodeMap.get('cebo');
+      cebo.x = W / 2; cebo.y = H / 2;
+      cebo.fx = W / 2; cebo.fy = H / 2; // pin permanently at center
+
+      const groups = graph.nodes.filter(n => n.type === 'group');
+      groups.forEach((g, i) => {
+        const angle = (i / groups.length) * 2 * Math.PI - Math.PI / 2;
+        g.x = W / 2 + Math.cos(angle) * 190;
+        g.y = H / 2 + Math.sin(angle) * 190;
       });
 
-      const t = new Date(timestamp);
-      document.getElementById('last-check').textContent =
-        t.toTimeString().slice(0, 8);
+      graph.nodes.filter(n => n.type === 'service').forEach(n => {
+        const g = graph.nodeMap.get(n.group);
+        const angle = Math.random() * 2 * Math.PI;
+        n.x = (g?.x ?? W / 2) + Math.cos(angle) * 95;
+        n.y = (g?.y ?? H / 2) + Math.sin(angle) * 95;
+      });
     }
+
+    // ── State ────────────────────────────────────────────────────────────────
+    let svg, graphLayer;
+    let W = 0, H = 0;
+    let rendered = false;
+    let lastGroups = null;
+    let currentGraph = null;
+    let simulation = null;
+
+    let linkSel, nodeSel;
+    let ceboPingEl = null;
+    const svcCircleRefs = new Map(); // serviceId → d3 selection of <circle>
+    const svcHaloRefs   = new Map(); // serviceId → d3 selection of outer halo <circle>
+    const groupBadgeRefs = new Map(); // groupId → d3 selection of count <text>
 
     // ── Initialise SVG canvas ────────────────────────────────────────────────
     function initSVG() {
@@ -706,40 +518,342 @@
 
       svg = d3.select('#chart').attr('width', W).attr('height', H);
 
-      // Dark background rect
-      svg.append('rect').attr('width', W).attr('height', H).attr('fill', '#07090f');
+      const defs = svg.append('defs');
 
-      // Decorative concentric rings
-      const cx = W / 2, cy = H / 2;
-      const baseR = Math.min(W, H) * 0.47;
-      const ringsG = svg.append('g');
-      [0.38, 0.60, 0.80, 1.0].forEach(f => {
-        ringsG.append('circle')
-          .attr('cx', cx).attr('cy', cy).attr('r', baseR * f)
-          .attr('fill', 'none')
-          .attr('stroke', 'rgba(80,130,200,0.04)')
-          .attr('stroke-width', 1)
-          .attr('stroke-dasharray', '4 10');
-      });
+      // Node drop-shadow filter
+      const f = defs.append('filter')
+        .attr('id', 'node-shadow')
+        .attr('x', '-40%').attr('y', '-40%')
+        .attr('width', '180%').attr('height', '180%');
+      f.append('feDropShadow')
+        .attr('dx', 0).attr('dy', 2)
+        .attr('stdDeviation', 4)
+        .attr('flood-color', 'rgba(38,52,68,0.13)');
 
-      packG = svg.append('g');
+      // Background
+      svg.append('rect').attr('width', W).attr('height', H).attr('fill', '#f6f3ec');
+
+      graphLayer = svg.append('g').attr('class', 'graph-layer');
     }
 
-    // ── Handle incoming status message ───────────────────────────────────────
+    // ── Drag: pin while dragging, release on drop (except root) ─────────────
+    function makeDrag(sim) {
+      return d3.drag()
+        .on('start', (ev, d) => {
+          if (!ev.active) sim.alphaTarget(0.3).restart();
+          d.fx = d.x; d.fy = d.y;
+        })
+        .on('drag', (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+        .on('end', (ev, d) => {
+          if (!ev.active) sim.alphaTarget(0);
+          if (d.type !== 'root') { d.fx = null; d.fy = null; }
+        });
+    }
+
+    // ── Render full graph ────────────────────────────────────────────────────
+    function renderGraph(graph) {
+      svcCircleRefs.clear();
+      svcHaloRefs.clear();
+      groupBadgeRefs.clear();
+      ceboPingEl = null;
+      graphLayer.selectAll('*').remove();
+
+      // ── Force simulation ──────────────────────────────────────────────────
+      if (simulation) simulation.stop();
+
+      simulation = d3.forceSimulation(graph.nodes)
+        .force('link', d3.forceLink(graph.links)
+          .id(d => d.id)
+          .distance(d => d.linkType === 'root-group' ? 185 : 105)
+          .strength(d => d.linkType === 'root-group' ? 0.45 : 0.75))
+        .force('charge', d3.forceManyBody()
+          .strength(d => ({ root: -700, group: -440, service: -175 }[d.type] ?? -175)))
+        .force('center', d3.forceCenter(W / 2, H / 2).strength(0.04))
+        .force('collide', d3.forceCollide()
+          .radius(d => nodeRadius(d) + 22).strength(0.88))
+        .alphaDecay(0.013)
+        .on('tick', ticked);
+
+      // ── Links ─────────────────────────────────────────────────────────────
+      linkSel = graphLayer.append('g')
+        .selectAll('line')
+        .data(graph.links)
+        .enter().append('line')
+        .attr('stroke', d =>
+          d.linkType === 'root-group'
+            ? 'rgba(38,52,68,0.13)'
+            : d.groupColor + '42')   // group color @ ~26% opacity
+        .attr('stroke-width', d => d.linkType === 'root-group' ? 1.5 : 1)
+        .attr('stroke-linecap', 'round');
+
+      // ── Node <g> elements ─────────────────────────────────────────────────
+      nodeSel = graphLayer.append('g')
+        .selectAll('g')
+        .data(graph.nodes)
+        .enter().append('g')
+        .attr('class', d => `node node-${d.type}`)
+        .call(makeDrag(simulation));
+
+      // ── ROOT / CEBO ───────────────────────────────────────────────────────
+      const ceboG = nodeSel.filter(d => d.type === 'root');
+
+      // Expanding ping ring (animated on each status update)
+      ceboG.append('circle')
+        .attr('r', R.root)
+        .attr('fill', 'none')
+        .attr('stroke', '#263444')
+        .attr('stroke-width', 1.5)
+        .attr('opacity', 0)
+        .each(function() { ceboPingEl = d3.select(this); });
+
+      // Soft outer halo
+      ceboG.append('circle')
+        .attr('r', R.root + 8)
+        .attr('fill', 'rgba(38,52,68,0.05)')
+        .attr('stroke', 'none');
+
+      // Main fill
+      ceboG.append('circle')
+        .attr('r', R.root)
+        .attr('fill', '#263444')
+        .attr('filter', 'url(#node-shadow)');
+
+      // Label
+      ceboG.append('text')
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'central')
+        .attr('font-family', "'Syne', sans-serif")
+        .attr('font-size', 13)
+        .attr('font-weight', '800')
+        .attr('letter-spacing', '0.18em')
+        .attr('fill', '#f6f3ec')
+        .attr('pointer-events', 'none')
+        .text('CEBO');
+
+      // ── GROUP nodes ───────────────────────────────────────────────────────
+      const groupG = nodeSel.filter(d => d.type === 'group');
+
+      // Soft outer halo
+      groupG.append('circle')
+        .attr('r', R.group + 8)
+        .attr('fill', d => d.meta.color + '18')
+        .attr('stroke', 'none');
+
+      // Main circle
+      groupG.append('circle')
+        .attr('r', R.group)
+        .attr('fill', d => d.meta.fill)
+        .attr('stroke', d => d.meta.color)
+        .attr('stroke-width', 2.5)
+        .attr('filter', 'url(#node-shadow)');
+
+      // Group name (top half of circle)
+      groupG.append('text')
+        .attr('y', -5)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'central')
+        .attr('font-family', "'Syne', sans-serif")
+        .attr('font-size', 7.5)
+        .attr('font-weight', '800')
+        .attr('letter-spacing', '0.09em')
+        .attr('fill', d => d.meta.color)
+        .attr('pointer-events', 'none')
+        .text(d => d.label);
+
+      // Service count badge (bottom half)
+      const countTexts = groupG.append('text')
+        .attr('y', 9)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'central')
+        .attr('font-family', "'JetBrains Mono', monospace")
+        .attr('font-size', 8)
+        .attr('font-weight', '600')
+        .attr('fill', d => d.meta.color)
+        .attr('opacity', 0.55)
+        .attr('pointer-events', 'none')
+        .text('—');
+
+      countTexts.each(function(d) { groupBadgeRefs.set(d.id, d3.select(this)); });
+
+      // ── SERVICE nodes ─────────────────────────────────────────────────────
+      const svcG = nodeSel.filter(d => d.type === 'service');
+      const tooltip = document.getElementById('tooltip');
+
+      // Outer availability halo
+      const halos = svcG.append('circle')
+        .attr('r', R.service + 6)
+        .attr('fill', d => d.available ? COLORS.greenHalo : COLORS.redHalo)
+        .attr('stroke', 'none');
+
+      halos.each(function(d) { svcHaloRefs.set(d.id, d3.select(this)); });
+
+      // Main service circle
+      const circles = svcG.append('circle')
+        .attr('r', R.service)
+        .attr('fill', d => d.available ? COLORS.greenFill : COLORS.redFill)
+        .attr('stroke', d => d.available ? COLORS.green : COLORS.red)
+        .attr('stroke-width', 2)
+        .attr('filter', 'url(#node-shadow)')
+        .classed('unavail-pulse', d => !d.available);
+
+      circles.each(function(d) { svcCircleRefs.set(d.id, d3.select(this)); });
+
+      // Center status dot
+      svcG.append('circle')
+        .attr('r', 3)
+        .attr('fill', d => d.available ? COLORS.green : COLORS.red)
+        .attr('opacity', 0.6)
+        .attr('pointer-events', 'none');
+
+      // Service name (below circle)
+      svcG.append('text')
+        .attr('y', R.service + 13)
+        .attr('text-anchor', 'middle')
+        .attr('font-family', "'JetBrains Mono', monospace")
+        .attr('font-size', 9.5)
+        .attr('font-weight', '500')
+        .attr('fill', '#263444')
+        .attr('opacity', 0.72)
+        .attr('pointer-events', 'none')
+        .text(d => d.name);
+
+      // Port (below name)
+      svcG.append('text')
+        .attr('y', R.service + 24)
+        .attr('text-anchor', 'middle')
+        .attr('font-family', "'JetBrains Mono', monospace")
+        .attr('font-size', 8)
+        .attr('fill', '#7a93a8')
+        .attr('pointer-events', 'none')
+        .text(d => `:${d.port}`);
+
+      // Tooltip interactions
+      svcG
+        .on('mouseenter', (ev, d) => {
+          const live = currentGraph?.nodeMap.get(d.id);
+          const av   = live ? live.available : d.available;
+          const meta = getGroupMeta(d.group);
+          document.getElementById('tt-name').textContent  = d.name;
+          const grpEl = document.getElementById('tt-group');
+          grpEl.textContent  = meta.name;
+          grpEl.style.color  = meta.color;
+          document.getElementById('tt-node').textContent  = d.node;
+          document.getElementById('tt-port').textContent  = `TCP :${d.port}`;
+          const st = document.getElementById('tt-status');
+          st.textContent = av ? '● ONLINE' : '● OFFLINE';
+          st.className   = `tt-status ${av ? 'up' : 'down'}`;
+          tooltip.classList.add('show');
+        })
+        .on('mousemove', ev => {
+          tooltip.style.left = `${ev.clientX + 16}px`;
+          tooltip.style.top  = `${ev.clientY - 12}px`;
+        })
+        .on('mouseleave', () => tooltip.classList.remove('show'));
+
+      // Seed group count badges with current data
+      refreshGroupBadges(graph);
+    }
+
+    // ── Tick: clamp to bounds, then update positions ──────────────────────────
+    function ticked() {
+      currentGraph?.nodes.forEach(n => {
+        const r = nodeRadius(n) + 5;
+        n.x = Math.max(r, Math.min(W - r, n.x));
+        n.y = Math.max(r, Math.min(H - r, n.y));
+      });
+
+      linkSel
+        .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+
+      nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+    }
+
+    // ── Populate group badge counts from node data ────────────────────────────
+    function refreshGroupBadges(graph) {
+      const counts = {};
+      graph.nodes.filter(n => n.type === 'service').forEach(n => {
+        if (!counts[n.group]) counts[n.group] = { up: 0, total: 0 };
+        counts[n.group].total++;
+        if (n.available) counts[n.group].up++;
+      });
+      Object.entries(counts).forEach(([g, c]) => {
+        groupBadgeRefs.get(g)?.text(`${c.up}/${c.total}`);
+      });
+    }
+
+    // ── Incremental color + badge update (subsequent status pushes) ───────────
+    function updateColors(groups) {
+      const counts = {};
+
+      Object.entries(groups).forEach(([gName, svcs]) => {
+        counts[gName] = { up: 0, total: svcs.length };
+
+        svcs.forEach(({ name, available }) => {
+          const id       = `${gName}:${name}`;
+          const nodeData = currentGraph?.nodeMap.get(id);
+          if (nodeData) nodeData.available = available;
+          if (available) counts[gName].up++;
+
+          const circle = svcCircleRefs.get(id);
+          if (circle) {
+            circle
+              .classed('unavail-pulse', !available)
+              .transition().duration(500)
+              .attr('fill',   available ? COLORS.greenFill : COLORS.redFill)
+              .attr('stroke', available ? COLORS.green     : COLORS.red);
+          }
+
+          const halo = svcHaloRefs.get(id);
+          if (halo) {
+            halo.transition().duration(500)
+              .attr('fill', available ? COLORS.greenHalo : COLORS.redHalo);
+          }
+        });
+      });
+
+      // Update group badges
+      Object.entries(counts).forEach(([g, c]) => {
+        groupBadgeRefs.get(g)?.text(`${c.up}/${c.total}`);
+      });
+
+      // CEBO ping — brief expanding ring to signal a check completed
+      if (ceboPingEl) {
+        ceboPingEl
+          .attr('r', R.root).attr('opacity', 0.55).attr('stroke-width', 1.5)
+          .transition().duration(900).ease(d3.easeCubicOut)
+          .attr('r', R.root + 28).attr('opacity', 0).attr('stroke-width', 0.5);
+      }
+    }
+
+    // ── Update header stat counters ───────────────────────────────────────────
+    function updateHeaderStats(timestamp, groups) {
+      Object.entries(groups).forEach(([g, svcs]) => {
+        const up = svcs.filter(s => s.available).length;
+        const el = document.getElementById(`${g}-count`);
+        if (el) el.textContent = `${up} / ${svcs.length}`;
+      });
+      const t = new Date(timestamp);
+      document.getElementById('last-check').textContent = t.toTimeString().slice(0, 8);
+    }
+
+    // ── Handle incoming WebSocket status message ──────────────────────────────
     function handleStatus(msg) {
       lastGroups = msg.groups;
       document.getElementById('loading').classList.add('hidden');
-      updateStats(msg.timestamp, msg.groups);
+      updateHeaderStats(msg.timestamp, msg.groups);
 
       if (!rendered) {
-        fullRender(msg.groups);
+        currentGraph = buildGraph(msg.groups);
+        seedPositions(currentGraph);
+        renderGraph(currentGraph);
         rendered = true;
       } else {
         updateColors(msg.groups);
       }
     }
 
-    // ── WebSocket client with auto-reconnect ─────────────────────────────────
+    // ── WebSocket with auto-reconnect ─────────────────────────────────────────
     let ws, reconnTimer;
 
     function connect() {
@@ -768,7 +882,7 @@
       ws.onerror = () => ws.close();
     }
 
-    // ── Resize: re-run full layout with new dimensions ───────────────────────
+    // ── Resize: re-centre CEBO, nudge simulation ──────────────────────────────
     let resizeTimer;
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimer);
@@ -777,15 +891,18 @@
         W = main.clientWidth;
         H = main.clientHeight;
         svg.attr('width', W).attr('height', H);
-        if (lastGroups) {
-          rendered = false;
-          fullRender(lastGroups);
-          rendered = true;
+        svg.select('rect').attr('width', W).attr('height', H);
+        if (currentGraph) {
+          const cebo = currentGraph.nodeMap.get('cebo');
+          if (cebo) { cebo.fx = W / 2; cebo.fy = H / 2; }
+          simulation
+            ?.force('center', d3.forceCenter(W / 2, H / 2).strength(0.04))
+            .alpha(0.3).restart();
         }
-      }, 180);
+      }, 200);
     });
 
-    // ── Boot ─────────────────────────────────────────────────────────────────
+    // ── Boot ──────────────────────────────────────────────────────────────────
     document.fonts.ready.then(() => {
       initSVG();
       connect();
