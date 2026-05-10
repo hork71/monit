@@ -1,33 +1,40 @@
 'use strict';
 
 const express = require('express');
-const http    = require('http');
+const http = require('http');
 const WebSocket = require('ws');
-const net     = require('net');
-const path    = require('path');
+const net = require('net');
+const path = require('path');
 
-const app    = express();
+const app = express();
 const server = http.createServer(app);
-const wss    = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({ server });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
 const SERVICES = {
   puppet: [
-    { name: 'puppetserver',   node: 'localhost',    port: 8140 },
-    { name: 'puppetdb',       node: 'localhost',    port: 8081 },
-    { name: 'consoleweb',     node: 'example1.com', port: 4430 },
+    { name: 'puppetserver', node: 'localhost', port: 8140 },
+    { name: 'puppetdb', node: 'localhost', port: 8081 },
+    { name: 'consoleweb', node: 'example1.com', port: 4430 },
     { name: 'nodeclassifier', node: 'example1.com', port: 4433 },
-    { name: 'nginx',          node: 'localhost',    port: 443  },
+    { name: 'nginx', node: 'localhost', port: 443 },
     { name: 'orchestration1', node: 'example2.com', port: 8142 },
     { name: 'orchestration2', node: 'example2.com', port: 8143 },
-    { name: 'postgresql',     node: 'localhost',    port: 5432 },
+    { name: 'postgresql', node: 'localhost', port: 5432 },
   ],
   gitlab: [
-    { name: 'postgresql',  node: 'localhost',    port: 5432 },
-    { name: 'gitlabrails', node: 'example1.com', port: 443  },
-    { name: 'puma',        node: 'localhost',    port: 8080 },
-    { name: 'redis',       node: 'localhost',    port: 6379 },
+    { name: 'postgresql', node: 'localhost', port: 5432 },
+    { name: 'gitlabrails', node: 'example1.com', port: 443 },
+    { name: 'puma', node: 'localhost', port: 8080 },
+    { name: 'redis', node: 'localhost', port: 6379 },
+  ],
+  suma: [
+    { name: 'postgresql', node: 'localhost', port: 5432 },
+    { name: 'ssh', node: 'suma.com', port: 22 },
+    { name: 'gitlabrails', node: 'localhost', port: 443 },
+    { name: 'salt', node: 'suma.com', port: 8080 },
+    { name: 'redis', node: 'suma.com', port: 6379 },
   ],
 };
 
@@ -43,9 +50,9 @@ function checkPort(host, port) {
     const socket = new net.Socket();
     socket.setTimeout(2000);
     socket.connect(port, host);
-    socket.on('connect', () => { socket.destroy(); resolve(true);  });
+    socket.on('connect', () => { socket.destroy(); resolve(true); });
     socket.on('timeout', () => { socket.destroy(); resolve(false); });
-    socket.on('error',   () => { socket.destroy(); resolve(false); });
+    socket.on('error', () => { socket.destroy(); resolve(false); });
   });
 }
 

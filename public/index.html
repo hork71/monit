@@ -26,8 +26,8 @@
       --red-fill:    rgba(212, 36,  58,  0.10);
       --red-halo:    rgba(212, 36,  58,  0.07);
 
-      --cebo-bg:     #263444;
-      --cebo-fg:     #f6f3ec;
+      --cenbo-bg:     #263444;
+      --cenbo-fg:     #f6f3ec;
 
       --puppet:      #1565a0;
       --puppet-lt:   rgba(21, 101, 160, 0.09);
@@ -440,9 +440,9 @@
     };
 
     const GROUP_META = {
-      puppet: { color: '#1565a0', fill: 'rgba(21,101,160,0.09)', name: 'PUPPET' },
+      puppet: { color: '#b84400', fill: 'rgba(184,68,0,0.09)',   name: 'PUPPET' },
       gitlab: { color: '#b84400', fill: 'rgba(184,68,0,0.09)',   name: 'GITLAB' },
-      suma:   { color: '#286b50', fill: 'rgba(40,107,80,0.09)',  name: 'SUMA'   },
+      suma: { color: '#b84400', fill: 'rgba(184,68,0,0.09)',   name: 'SUMA' },
     };
 
     function getGroupMeta(id) {
@@ -453,16 +453,16 @@
     function nodeRadius(d) { return R[d.type] ?? R.service; }
 
     // ── Build D3 graph data from WebSocket status groups ─────────────────────
-    // Hierarchy: cebo (root) → group nodes → service nodes
+    // Hierarchy: cenbo (root) → group nodes → service nodes
     function buildGraph(groups) {
-      const nodes = [{ id: 'cebo', type: 'root' }];
+      const nodes = [{ id: 'cenbo', type: 'root' }];
       const links = [];
       const nodeMap = new Map();
 
       Object.entries(groups).forEach(([gName, services]) => {
         const meta = getGroupMeta(gName);
         nodes.push({ id: gName, type: 'group', meta, label: meta.name });
-        links.push({ source: 'cebo', target: gName, linkType: 'root-group' });
+        links.push({ source: 'cenbo', target: gName, linkType: 'root-group' });
 
         services.forEach(svc => {
           const id = `${gName}:${svc.name}`;
@@ -477,9 +477,9 @@
 
     // ── Position nodes before simulation starts for a faster, cleaner settle ─
     function seedPositions(graph) {
-      const cebo = graph.nodeMap.get('cebo');
-      cebo.x = W / 2; cebo.y = H / 2;
-      cebo.fx = W / 2; cebo.fy = H / 2; // pin permanently at center
+      const cenbo = graph.nodeMap.get('cenbo');
+      cenbo.x = W / 2; cenbo.y = H / 2;
+      cenbo.fx = W / 2; cenbo.fy = H / 2; // pin permanently at center
 
       const groups = graph.nodes.filter(n => n.type === 'group');
       groups.forEach((g, i) => {
@@ -505,7 +505,7 @@
     let simulation = null;
 
     let linkSel, nodeSel;
-    let ceboPingEl = null;
+    let cenboPingEl = null;
     const svcCircleRefs = new Map(); // serviceId → d3 selection of <circle>
     const svcHaloRefs   = new Map(); // serviceId → d3 selection of outer halo <circle>
     const groupBadgeRefs = new Map(); // groupId → d3 selection of count <text>
@@ -555,7 +555,7 @@
       svcCircleRefs.clear();
       svcHaloRefs.clear();
       groupBadgeRefs.clear();
-      ceboPingEl = null;
+      cenboPingEl = null;
       graphLayer.selectAll('*').remove();
 
       // ── Force simulation ──────────────────────────────────────────────────
@@ -594,32 +594,32 @@
         .attr('class', d => `node node-${d.type}`)
         .call(makeDrag(simulation));
 
-      // ── ROOT / CEBO ───────────────────────────────────────────────────────
-      const ceboG = nodeSel.filter(d => d.type === 'root');
+      // ── ROOT / cenbo ───────────────────────────────────────────────────────
+      const cenboG = nodeSel.filter(d => d.type === 'root');
 
       // Expanding ping ring (animated on each status update)
-      ceboG.append('circle')
+      cenboG.append('circle')
         .attr('r', R.root)
         .attr('fill', 'none')
         .attr('stroke', '#263444')
         .attr('stroke-width', 1.5)
         .attr('opacity', 0)
-        .each(function() { ceboPingEl = d3.select(this); });
+        .each(function() { cenboPingEl = d3.select(this); });
 
       // Soft outer halo
-      ceboG.append('circle')
+      cenboG.append('circle')
         .attr('r', R.root + 8)
         .attr('fill', 'rgba(38,52,68,0.05)')
         .attr('stroke', 'none');
 
       // Main fill
-      ceboG.append('circle')
+      cenboG.append('circle')
         .attr('r', R.root)
         .attr('fill', '#263444')
         .attr('filter', 'url(#node-shadow)');
 
       // Label
-      ceboG.append('text')
+      cenboG.append('text')
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'central')
         .attr('font-family', "'Syne', sans-serif")
@@ -628,7 +628,7 @@
         .attr('letter-spacing', '0.18em')
         .attr('fill', '#f6f3ec')
         .attr('pointer-events', 'none')
-        .text('CEBO');
+        .text('cenbo');
 
       // ── GROUP nodes ───────────────────────────────────────────────────────
       const groupG = nodeSel.filter(d => d.type === 'group');
@@ -817,9 +817,9 @@
         groupBadgeRefs.get(g)?.text(`${c.up}/${c.total}`);
       });
 
-      // CEBO ping — brief expanding ring to signal a check completed
-      if (ceboPingEl) {
-        ceboPingEl
+      // cenbo ping — brief expanding ring to signal a check completed
+      if (cenboPingEl) {
+        cenboPingEl
           .attr('r', R.root).attr('opacity', 0.55).attr('stroke-width', 1.5)
           .transition().duration(900).ease(d3.easeCubicOut)
           .attr('r', R.root + 28).attr('opacity', 0).attr('stroke-width', 0.5);
@@ -882,7 +882,7 @@
       ws.onerror = () => ws.close();
     }
 
-    // ── Resize: re-centre CEBO, nudge simulation ──────────────────────────────
+    // ── Resize: re-centre cenbo, nudge simulation ──────────────────────────────
     let resizeTimer;
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimer);
@@ -893,8 +893,8 @@
         svg.attr('width', W).attr('height', H);
         svg.select('rect').attr('width', W).attr('height', H);
         if (currentGraph) {
-          const cebo = currentGraph.nodeMap.get('cebo');
-          if (cebo) { cebo.fx = W / 2; cebo.fy = H / 2; }
+          const cenbo = currentGraph.nodeMap.get('cenbo');
+          if (cenbo) { cenbo.fx = W / 2; cenbo.fy = H / 2; }
           simulation
             ?.force('center', d3.forceCenter(W / 2, H / 2).strength(0.04))
             .alpha(0.3).restart();
