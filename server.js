@@ -14,34 +14,35 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const SERVICES = {
   puppet: [
-    { name: 'puppetserver',   port: 8140 },
-    { name: 'puppetdb',       port: 8081 },
-    { name: 'consoleweb',     port: 4430 },
-    { name: 'nodeclassifier', port: 4433 },
-    { name: 'nginx',          port: 443  },
-    { name: 'orchestration1', port: 8142 },
-    { name: 'orchestration2', port: 8143 },
-    { name: 'postgresql',     port: 5432 },
+    { name: 'puppetserver',   node: 'localhost',    port: 8140 },
+    { name: 'puppetdb',       node: 'localhost',    port: 8081 },
+    { name: 'consoleweb',     node: 'example1.com', port: 4430 },
+    { name: 'nodeclassifier', node: 'example1.com', port: 4433 },
+    { name: 'nginx',          node: 'localhost',    port: 443  },
+    { name: 'orchestration1', node: 'example2.com', port: 8142 },
+    { name: 'orchestration2', node: 'example2.com', port: 8143 },
+    { name: 'postgresql',     node: 'localhost',    port: 5432 },
   ],
   gitlab: [
-    { name: 'postgresql',   port: 5432 },
-    { name: 'gitlabrails',  port: 443  },
-    { name: 'puma',         port: 8080 },
-    { name: 'redis',        port: 6379 },
+    { name: 'postgresql',  node: 'localhost',    port: 5432 },
+    { name: 'gitlabrails', node: 'example1.com', port: 443  },
+    { name: 'puma',        node: 'localhost',    port: 8080 },
+    { name: 'redis',       node: 'localhost',    port: 6379 },
   ],
 };
 
 /**
- * Attempt a TCP connection to determine if a port is open.
+ * Attempt a TCP connection to determine if a port is open on a given host.
  * Resolves true on connect, false on timeout or error.
+ * @param {string} host
  * @param {number} port
  * @returns {Promise<boolean>}
  */
-function checkPort(port) {
+function checkPort(host, port) {
   return new Promise((resolve) => {
     const socket = new net.Socket();
     socket.setTimeout(2000);
-    socket.connect(port, '127.0.0.1');
+    socket.connect(port, host);
     socket.on('connect', () => { socket.destroy(); resolve(true);  });
     socket.on('timeout', () => { socket.destroy(); resolve(false); });
     socket.on('error',   () => { socket.destroy(); resolve(false); });
@@ -57,10 +58,11 @@ async function checkAllServices() {
   await Promise.all(
     Object.entries(SERVICES).map(async ([group, services]) => {
       groups[group] = await Promise.all(
-        services.map(async ({ name, port }) => ({
+        services.map(async ({ name, node, port }) => ({
           name,
+          node,
           port,
-          available: await checkPort(port),
+          available: await checkPort(node, port),
         }))
       );
     })

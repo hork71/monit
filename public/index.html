@@ -303,6 +303,14 @@
       line-height: 1;
     }
 
+    .tt-node {
+      font-size: 10px;
+      color: var(--text);
+      margin-bottom: 2px;
+      font-style: italic;
+      letter-spacing: 0.01em;
+    }
+
     .tt-port {
       font-size: 10.5px;
       color: var(--text-dim);
@@ -415,6 +423,7 @@
 
   <div id="tooltip">
     <div class="tt-name"   id="tt-name"></div>
+    <div class="tt-node"   id="tt-node"></div>
     <div class="tt-port"   id="tt-port"></div>
     <div class="tt-status" id="tt-status"></div>
   </div>
@@ -432,6 +441,7 @@
         puppet: { fill: 'rgba(0,180,216,0.055)', stroke: 'rgba(0,180,216,0.38)', label: '#00b4d8' },
         gitlab: { fill: 'rgba(232,93,4,0.055)',  stroke: 'rgba(232,93,4,0.38)',  label: '#e85d04' },
       },
+      cebo: { fill: 'rgba(201,168,76,0.04)', stroke: 'rgba(201,168,76,0.42)', label: '#d4b870' },
     };
 
     // ── State ────────────────────────────────────────────────────────────────
@@ -444,20 +454,30 @@
     const svcRefs = new Map();
 
     // ── Build D3 hierarchy from status groups ────────────────────────────────
+    // root (hidden) → cebo (central) → puppet/gitlab (groups) → services
     function buildHierarchy(groups) {
       return {
         name: 'root',
-        children: Object.entries(groups).map(([gName, svcs]) => ({
-          name: gName,
-          children: svcs.map(s => ({ ...s, value: 1 })),
-        })),
+        children: [{
+          name: 'cebo',
+          isCebo: true,
+          children: Object.entries(groups).map(([gName, svcs]) => ({
+            name: gName,
+            isGroup: true,
+            children: svcs.map(s => ({ ...s, value: 1 })),
+          })),
+        }],
       };
     }
 
     // ── Compute circle-pack layout ───────────────────────────────────────────
     function computePack(groups, w, h) {
       const root = d3.hierarchy(buildHierarchy(groups)).sum(d => d.value || 0);
-      d3.pack().size([w, h]).padding(n => n.depth === 0 ? 32 : 16)(root);
+      d3.pack().size([w, h]).padding(n => {
+        if (n.depth === 0) return 20;  // root → cebo
+        if (n.depth === 1) return 36;  // cebo → groups
+        return 18;                     // groups → services
+      })(root);
       return root;
     }
 
@@ -468,18 +488,56 @@
 
       const root = computePack(groups, W, H);
 
-      root.descendants().forEach(node => {
-        if (node.depth === 0) return;
+      root.descendants().forEach(pn => {
+        if (pn.depth === 0) return;
 
         const g = packG.append('g')
-          .attr('transform', `translate(${node.x},${node.y})`);
+          .attr('transform', `translate(${pn.x},${pn.y})`);
 
-        if (node.depth === 1) {
-          const st = C.group[node.data.name] || C.group.puppet;
+        if (pn.depth === 1) {
+          // ── Cebo central circle ───────────────────────────────────────────
+          // Outermost dashed ring
+          g.append('circle')
+            .attr('r', pn.r + 12)
+            .attr('fill', 'none')
+            .attr('stroke', 'rgba(201,168,76,0.15)')
+            .attr('stroke-width', 1)
+            .attr('stroke-dasharray', '3 9');
+
+          // Inner accent ring
+          g.append('circle')
+            .attr('r', pn.r + 4)
+            .attr('fill', 'none')
+            .attr('stroke', 'rgba(201,168,76,0.28)')
+            .attr('stroke-width', 1);
+
+          // Main cebo fill
+          g.append('circle')
+            .attr('r', pn.r)
+            .attr('fill', C.cebo.fill)
+            .attr('stroke', C.cebo.stroke)
+            .attr('stroke-width', 1.5);
+
+          // CEBO label at top of circle
+          const lsz = Math.max(13, Math.min(24, pn.r * 0.07));
+          g.append('text')
+            .attr('y', -pn.r + lsz + 16)
+            .attr('text-anchor', 'middle')
+            .attr('font-family', "'Syne', sans-serif")
+            .attr('font-size', lsz)
+            .attr('font-weight', '800')
+            .attr('letter-spacing', '0.24em')
+            .attr('fill', C.cebo.label)
+            .attr('opacity', 0.88)
+            .text('CEBO');
+
+        } else if (pn.depth === 2) {
+          // ── Group circle (puppet / gitlab) ────────────────────────────────
+          const st = C.group[pn.data.name] || C.group.puppet;
 
           // Outer decorative ring
           g.append('circle')
-            .attr('r', node.r + 8)
+            .attr('r', pn.r + 8)
             .attr('fill', 'none')
             .attr('stroke', st.stroke)
             .attr('stroke-width', 0.75)
@@ -487,15 +545,15 @@
 
           // Group fill + border
           g.append('circle')
-            .attr('r', node.r)
+            .attr('r', pn.r)
             .attr('fill', st.fill)
             .attr('stroke', st.stroke)
             .attr('stroke-width', 1.5);
 
           // Group label
-          const lsz = Math.max(11, Math.min(17, node.r * 0.10));
+          const lsz = Math.max(11, Math.min(17, pn.r * 0.10));
           g.append('text')
-            .attr('y', -node.r + lsz + 12)
+            .attr('y', -pn.r + lsz + 12)
             .attr('text-anchor', 'middle')
             .attr('font-family', "'Syne', sans-serif")
             .attr('font-size', lsz)
@@ -503,11 +561,12 @@
             .attr('letter-spacing', '0.16em')
             .attr('fill', st.label)
             .attr('opacity', 0.92)
-            .text(node.data.name.toUpperCase());
+            .text(pn.data.name.toUpperCase());
 
-        } else if (node.depth === 2) {
-          const groupName = node.parent.data.name;
-          const { name, port, available } = node.data;
+        } else if (pn.depth === 3) {
+          // ── Service circle ────────────────────────────────────────────────
+          const groupName = pn.parent.data.name;
+          const { name, node: hostname, port, available } = pn.data;
           const key   = `${groupName}:${name}`;
           const color = available ? C.green : C.red;
           const fill  = available ? C.greenFill : C.redFill;
@@ -515,13 +574,13 @@
 
           // Outer glow halo
           const glowEl = g.append('circle')
-            .attr('r', node.r + 5)
+            .attr('r', pn.r + 5)
             .attr('fill', glow)
             .attr('class', available ? 'anim-up' : 'anim-down');
 
           // Main service circle
           const circleEl = g.append('circle')
-            .attr('r', node.r)
+            .attr('r', pn.r)
             .attr('fill', fill)
             .attr('stroke', color)
             .attr('stroke-width', 1.5);
@@ -530,16 +589,16 @@
 
           // Center status dot
           g.append('circle')
-            .attr('r', Math.max(2, node.r * 0.09))
+            .attr('r', Math.max(2, pn.r * 0.09))
             .attr('fill', color)
             .attr('opacity', 0.85);
 
           // Text labels
-          const fsz  = Math.max(8, Math.min(12, node.r * 0.27));
+          const fsz  = Math.max(8, Math.min(12, pn.r * 0.27));
           const textEls = [];
 
-          if (node.r > 22) {
-            const hasPort = node.r > 36;
+          if (pn.r > 22) {
+            const hasPort = pn.r > 36;
             const nameY   = hasPort ? -fsz * 0.65 : 0;
 
             const nameEl = g.append('text')
@@ -568,8 +627,8 @@
             }
           }
 
-          // Store reference for incremental updates
-          svcRefs.set(key, { glowEl, circleEl, textEls, available });
+          // Store reference for incremental color updates
+          svcRefs.set(key, { glowEl, circleEl, textEls, available, hostname });
 
           // Tooltip interactions
           const tooltip = document.getElementById('tooltip');
@@ -578,6 +637,7 @@
               const ref = svcRefs.get(key);
               const av  = ref ? ref.available : available;
               document.getElementById('tt-name').textContent = name;
+              document.getElementById('tt-node').textContent = ref ? ref.hostname : hostname;
               document.getElementById('tt-port').textContent = `TCP :${port}`;
               const statusEl = document.getElementById('tt-status');
               statusEl.textContent = av ? '● ONLINE' : '● OFFLINE';
@@ -702,7 +762,7 @@
       ws.onclose = () => {
         document.getElementById('conn-dot').classList.add('off');
         document.getElementById('conn-label').textContent = 'reconnecting';
-        reconnTimer = setTimeout(connect, 30000);
+        reconnTimer = setTimeout(connect, 3000);
       };
 
       ws.onerror = () => ws.close();
