@@ -168,12 +168,22 @@
 
     @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 
-    /* ── Main / SVG ──────────────────────────────────────────────────────────── */
+    /* ── Main layout ─────────────────────────────────────────────────────────── */
 
     main {
       flex: 1;
       position: relative;
       z-index: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: row;
+    }
+
+    /* ── Graph area ──────────────────────────────────────────────────────────── */
+
+    #graph-area {
+      flex: 1;
+      position: relative;
       overflow: hidden;
     }
 
@@ -331,6 +341,185 @@
     }
 
     .unavail-pulse { animation: pulse-down 1.6s ease-in-out infinite; }
+
+    /* ── Event log panel ─────────────────────────────────────────────────────── */
+
+    #event-log {
+      width: 268px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: -2px 0 12px rgba(38,52,68,0.05);
+    }
+
+    .log-header {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      height: 38px;
+      border-bottom: 1px solid var(--border);
+      gap: 8px;
+    }
+
+    .log-title {
+      font-size: 8px;
+      letter-spacing: 0.20em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--text-muted);
+      flex: 1;
+    }
+
+    .log-count {
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--text-dim);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1px 7px;
+      min-width: 22px;
+      text-align: center;
+    }
+
+    .log-clear {
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 10px;
+      color: var(--text-dim);
+      padding: 3px 5px;
+      border-radius: 3px;
+      line-height: 1;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .log-clear:hover { color: var(--red); background: rgba(212,36,58,0.07); }
+    .log-clear:active { background: rgba(212,36,58,0.14); }
+    .log-clear:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+
+    .log-body {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .log-body::-webkit-scrollbar { width: 4px; }
+    .log-body::-webkit-scrollbar-track { background: transparent; }
+    .log-body::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    .log-empty {
+      padding: 32px 16px;
+      text-align: center;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      line-height: 1.8;
+    }
+
+    @keyframes log-slide-in {
+      from { transform: translateY(-6px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    .log-entry {
+      display: flex;
+      align-items: stretch;
+      border-bottom: 1px solid var(--border);
+      animation: log-slide-in 0.22s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+      position: relative;
+    }
+
+    .log-entry:last-child { border-bottom: none; }
+
+    .log-accent {
+      width: 3px;
+      flex-shrink: 0;
+    }
+
+    .log-entry.up   .log-accent { background: var(--green); }
+    .log-entry.down .log-accent { background: var(--red); }
+
+    .log-content {
+      flex: 1;
+      padding: 9px 12px 9px 11px;
+      min-width: 0;
+    }
+
+    .log-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 6px;
+      margin-bottom: 3px;
+    }
+
+    .log-service {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+
+    .log-time {
+      font-size: 9px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .log-mid {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 2px;
+    }
+
+    .log-group-tag {
+      font-size: 7.5px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .log-sep-dot {
+      width: 2px; height: 2px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .log-direction {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .log-entry.up   .log-direction { color: var(--green); }
+    .log-entry.down .log-direction { color: var(--red); }
+
+    .log-host {
+      font-size: 8.5px;
+      color: var(--text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
   </style>
 </head>
 <body>
@@ -384,40 +573,53 @@
   </header>
 
   <main>
-    <svg id="chart"></svg>
+    <div id="graph-area">
+      <svg id="chart"></svg>
 
-    <div class="loading" id="loading">
-      <div class="loading-ring"></div>
-      <div class="loading-text">Running diagnostics…</div>
+      <div class="loading" id="loading">
+        <div class="loading-ring"></div>
+        <div class="loading-text">Running diagnostics…</div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item">
+          <div class="pip" style="border-color:var(--puppet);background:var(--puppet-lt);"></div>
+          Puppet
+        </div>
+        <div class="legend-item">
+          <div class="pip" style="border-color:var(--gitlab);background:var(--gitlab-lt);"></div>
+          GitLab
+        </div>
+        <div class="legend-item">
+          <div class="pip" style="border-color:var(--suma);background:var(--suma-lt);"></div>
+          Suma
+        </div>
+        <div class="legend-sep"></div>
+        <div class="legend-item">
+          <div class="pip" style="border-color:var(--green);background:var(--green-fill);"></div>
+          Available
+        </div>
+        <div class="legend-item">
+          <div class="pip" style="border-color:var(--red);background:var(--red-fill);"></div>
+          Unavailable
+        </div>
+        <div class="legend-sep"></div>
+        <div class="legend-item" style="color:var(--text-dim);">
+          drag to reposition
+        </div>
+      </div>
     </div>
 
-    <div class="legend">
-      <div class="legend-item">
-        <div class="pip" style="border-color:var(--puppet);background:var(--puppet-lt);"></div>
-        Puppet
+    <aside id="event-log">
+      <div class="log-header">
+        <span class="log-title">Status Changes</span>
+        <span class="log-count" id="log-count">0</span>
+        <button class="log-clear" id="log-clear" title="Clear log">✕</button>
       </div>
-      <div class="legend-item">
-        <div class="pip" style="border-color:var(--gitlab);background:var(--gitlab-lt);"></div>
-        GitLab
+      <div class="log-body" id="log-body">
+        <div class="log-empty" id="log-empty">Monitoring for changes…</div>
       </div>
-      <div class="legend-item">
-        <div class="pip" style="border-color:var(--suma);background:var(--suma-lt);"></div>
-        Suma
-      </div>
-      <div class="legend-sep"></div>
-      <div class="legend-item">
-        <div class="pip" style="border-color:var(--green);background:var(--green-fill);"></div>
-        Available
-      </div>
-      <div class="legend-item">
-        <div class="pip" style="border-color:var(--red);background:var(--red-fill);"></div>
-        Unavailable
-      </div>
-      <div class="legend-sep"></div>
-      <div class="legend-item" style="color:var(--text-dim);">
-        drag to reposition
-      </div>
-    </div>
+    </aside>
   </main>
 
   <div id="tooltip">
@@ -440,9 +642,9 @@
     };
 
     const GROUP_META = {
-      puppet: { color: '#b84400', fill: 'rgba(184,68,0,0.09)',   name: 'PUPPET' },
-      gitlab: { color: '#b84400', fill: 'rgba(184,68,0,0.09)',   name: 'GITLAB' },
-      suma: { color: '#b84400', fill: 'rgba(184,68,0,0.09)',   name: 'SUMA' },
+      puppet: { color: '#1565a0', fill: 'rgba(21,101,160,0.09)',  name: 'PUPPET' },
+      gitlab: { color: '#b84400', fill: 'rgba(184,68,0,0.09)',    name: 'GITLAB' },
+      suma:   { color: '#286b50', fill: 'rgba(40,107,80,0.09)',   name: 'SUMA'   },
     };
 
     function getGroupMeta(id) {
@@ -453,7 +655,6 @@
     function nodeRadius(d) { return R[d.type] ?? R.service; }
 
     // ── Build D3 graph data from WebSocket status groups ─────────────────────
-    // Hierarchy: cenbo (root) → group nodes → service nodes
     function buildGraph(groups) {
       const nodes = [{ id: 'cenbo', type: 'root' }];
       const links = [];
@@ -475,11 +676,11 @@
       return { nodes, links, nodeMap };
     }
 
-    // ── Position nodes before simulation starts for a faster, cleaner settle ─
+    // ── Seed positions for fast simulation convergence ────────────────────────
     function seedPositions(graph) {
       const cenbo = graph.nodeMap.get('cenbo');
       cenbo.x = W / 2; cenbo.y = H / 2;
-      cenbo.fx = W / 2; cenbo.fy = H / 2; // pin permanently at center
+      cenbo.fx = W / 2; cenbo.fy = H / 2;
 
       const groups = graph.nodes.filter(n => n.type === 'group');
       groups.forEach((g, i) => {
@@ -496,7 +697,7 @@
       });
     }
 
-    // ── State ────────────────────────────────────────────────────────────────
+    // ── Graph state ──────────────────────────────────────────────────────────
     let svg, graphLayer;
     let W = 0, H = 0;
     let rendered = false;
@@ -506,21 +707,26 @@
 
     let linkSel, nodeSel;
     let cenboPingEl = null;
-    const svcCircleRefs = new Map(); // serviceId → d3 selection of <circle>
-    const svcHaloRefs   = new Map(); // serviceId → d3 selection of outer halo <circle>
-    const groupBadgeRefs = new Map(); // groupId → d3 selection of count <text>
+    const svcCircleRefs  = new Map();
+    const svcHaloRefs    = new Map();
+    const groupBadgeRefs = new Map();
+
+    // ── Event log state ──────────────────────────────────────────────────────
+    // Maps serviceId → last known available state for delta detection
+    const prevStatusMap = new Map();
+    let logEntryCount = 0;
+    const MAX_LOG_ENTRIES = 120;
 
     // ── Initialise SVG canvas ────────────────────────────────────────────────
     function initSVG() {
-      const main = document.querySelector('main');
-      W = main.clientWidth;
-      H = main.clientHeight;
+      const graphArea = document.getElementById('graph-area');
+      W = graphArea.clientWidth;
+      H = graphArea.clientHeight;
 
       svg = d3.select('#chart').attr('width', W).attr('height', H);
 
       const defs = svg.append('defs');
 
-      // Node drop-shadow filter
       const f = defs.append('filter')
         .attr('id', 'node-shadow')
         .attr('x', '-40%').attr('y', '-40%')
@@ -530,13 +736,12 @@
         .attr('stdDeviation', 4)
         .attr('flood-color', 'rgba(38,52,68,0.13)');
 
-      // Background
       svg.append('rect').attr('width', W).attr('height', H).attr('fill', '#f6f3ec');
 
       graphLayer = svg.append('g').attr('class', 'graph-layer');
     }
 
-    // ── Drag: pin while dragging, release on drop (except root) ─────────────
+    // ── Drag: pin while dragging, release on drop (root stays pinned) ────────
     function makeDrag(sim) {
       return d3.drag()
         .on('start', (ev, d) => {
@@ -558,7 +763,6 @@
       cenboPingEl = null;
       graphLayer.selectAll('*').remove();
 
-      // ── Force simulation ──────────────────────────────────────────────────
       if (simulation) simulation.stop();
 
       simulation = d3.forceSimulation(graph.nodes)
@@ -574,7 +778,6 @@
         .alphaDecay(0.013)
         .on('tick', ticked);
 
-      // ── Links ─────────────────────────────────────────────────────────────
       linkSel = graphLayer.append('g')
         .selectAll('line')
         .data(graph.links)
@@ -582,11 +785,10 @@
         .attr('stroke', d =>
           d.linkType === 'root-group'
             ? 'rgba(38,52,68,0.13)'
-            : d.groupColor + '42')   // group color @ ~26% opacity
+            : d.groupColor + '42')
         .attr('stroke-width', d => d.linkType === 'root-group' ? 1.5 : 1)
         .attr('stroke-linecap', 'round');
 
-      // ── Node <g> elements ─────────────────────────────────────────────────
       nodeSel = graphLayer.append('g')
         .selectAll('g')
         .data(graph.nodes)
@@ -597,7 +799,6 @@
       // ── ROOT / cenbo ───────────────────────────────────────────────────────
       const cenboG = nodeSel.filter(d => d.type === 'root');
 
-      // Expanding ping ring (animated on each status update)
       cenboG.append('circle')
         .attr('r', R.root)
         .attr('fill', 'none')
@@ -606,19 +807,16 @@
         .attr('opacity', 0)
         .each(function() { cenboPingEl = d3.select(this); });
 
-      // Soft outer halo
       cenboG.append('circle')
         .attr('r', R.root + 8)
         .attr('fill', 'rgba(38,52,68,0.05)')
         .attr('stroke', 'none');
 
-      // Main fill
       cenboG.append('circle')
         .attr('r', R.root)
         .attr('fill', '#263444')
         .attr('filter', 'url(#node-shadow)');
 
-      // Label
       cenboG.append('text')
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'central')
@@ -633,13 +831,11 @@
       // ── GROUP nodes ───────────────────────────────────────────────────────
       const groupG = nodeSel.filter(d => d.type === 'group');
 
-      // Soft outer halo
       groupG.append('circle')
         .attr('r', R.group + 8)
         .attr('fill', d => d.meta.color + '18')
         .attr('stroke', 'none');
 
-      // Main circle
       groupG.append('circle')
         .attr('r', R.group)
         .attr('fill', d => d.meta.fill)
@@ -647,7 +843,6 @@
         .attr('stroke-width', 2.5)
         .attr('filter', 'url(#node-shadow)');
 
-      // Group name (top half of circle)
       groupG.append('text')
         .attr('y', -5)
         .attr('text-anchor', 'middle')
@@ -660,7 +855,6 @@
         .attr('pointer-events', 'none')
         .text(d => d.label);
 
-      // Service count badge (bottom half)
       const countTexts = groupG.append('text')
         .attr('y', 9)
         .attr('text-anchor', 'middle')
@@ -679,7 +873,6 @@
       const svcG = nodeSel.filter(d => d.type === 'service');
       const tooltip = document.getElementById('tooltip');
 
-      // Outer availability halo
       const halos = svcG.append('circle')
         .attr('r', R.service + 6)
         .attr('fill', d => d.available ? COLORS.greenHalo : COLORS.redHalo)
@@ -687,7 +880,6 @@
 
       halos.each(function(d) { svcHaloRefs.set(d.id, d3.select(this)); });
 
-      // Main service circle
       const circles = svcG.append('circle')
         .attr('r', R.service)
         .attr('fill', d => d.available ? COLORS.greenFill : COLORS.redFill)
@@ -698,14 +890,12 @@
 
       circles.each(function(d) { svcCircleRefs.set(d.id, d3.select(this)); });
 
-      // Center status dot
       svcG.append('circle')
         .attr('r', 3)
         .attr('fill', d => d.available ? COLORS.green : COLORS.red)
         .attr('opacity', 0.6)
         .attr('pointer-events', 'none');
 
-      // Service name (below circle)
       svcG.append('text')
         .attr('y', R.service + 13)
         .attr('text-anchor', 'middle')
@@ -717,7 +907,6 @@
         .attr('pointer-events', 'none')
         .text(d => d.name);
 
-      // Port (below name)
       svcG.append('text')
         .attr('y', R.service + 24)
         .attr('text-anchor', 'middle')
@@ -727,7 +916,6 @@
         .attr('pointer-events', 'none')
         .text(d => `:${d.port}`);
 
-      // Tooltip interactions
       svcG
         .on('mouseenter', (ev, d) => {
           const live = currentGraph?.nodeMap.get(d.id);
@@ -750,11 +938,10 @@
         })
         .on('mouseleave', () => tooltip.classList.remove('show'));
 
-      // Seed group count badges with current data
       refreshGroupBadges(graph);
     }
 
-    // ── Tick: clamp to bounds, then update positions ──────────────────────────
+    // ── Tick: clamp nodes to graph area bounds ────────────────────────────────
     function ticked() {
       currentGraph?.nodes.forEach(n => {
         const r = nodeRadius(n) + 5;
@@ -769,7 +956,7 @@
       nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
     }
 
-    // ── Populate group badge counts from node data ────────────────────────────
+    // ── Group badge counts ────────────────────────────────────────────────────
     function refreshGroupBadges(graph) {
       const counts = {};
       graph.nodes.filter(n => n.type === 'service').forEach(n => {
@@ -782,7 +969,7 @@
       });
     }
 
-    // ── Incremental color + badge update (subsequent status pushes) ───────────
+    // ── Incremental color + badge update ─────────────────────────────────────
     function updateColors(groups) {
       const counts = {};
 
@@ -812,12 +999,10 @@
         });
       });
 
-      // Update group badges
       Object.entries(counts).forEach(([g, c]) => {
         groupBadgeRefs.get(g)?.text(`${c.up}/${c.total}`);
       });
 
-      // cenbo ping — brief expanding ring to signal a check completed
       if (cenboPingEl) {
         cenboPingEl
           .attr('r', R.root).attr('opacity', 0.55).attr('stroke-width', 1.5)
@@ -826,7 +1011,7 @@
       }
     }
 
-    // ── Update header stat counters ───────────────────────────────────────────
+    // ── Header stat counters ──────────────────────────────────────────────────
     function updateHeaderStats(timestamp, groups) {
       Object.entries(groups).forEach(([g, svcs]) => {
         const up = svcs.filter(s => s.available).length;
@@ -837,11 +1022,104 @@
       document.getElementById('last-check').textContent = t.toTimeString().slice(0, 8);
     }
 
+    // ── Event log: detect state changes and populate log entries ─────────────
+    function detectAndLogChanges(groups, timestamp) {
+      const time = new Date(timestamp);
+      const timeStr = time.toTimeString().slice(0, 8);
+      const changes = [];
+
+      Object.entries(groups).forEach(([gName, svcs]) => {
+        svcs.forEach(svc => {
+          const id   = `${gName}:${svc.name}`;
+          const prev = prevStatusMap.get(id);
+          if (prev !== undefined && prev !== svc.available) {
+            changes.push({ id, gName, svc, available: svc.available, timeStr });
+          }
+          prevStatusMap.set(id, svc.available);
+        });
+      });
+
+      changes.forEach(({ gName, svc, available, timeStr }) => {
+        appendLogEntry(gName, svc, available, timeStr);
+      });
+    }
+
+    function appendLogEntry(gName, svc, isUp, timeStr) {
+      const body   = document.getElementById('log-body');
+      const empty  = document.getElementById('log-empty');
+      const counter = document.getElementById('log-count');
+      const meta   = getGroupMeta(gName);
+
+      if (empty) empty.remove();
+
+      logEntryCount++;
+      counter.textContent = logEntryCount;
+
+      // Prune oldest entries beyond MAX_LOG_ENTRIES
+      const existing = body.querySelectorAll('.log-entry');
+      if (existing.length >= MAX_LOG_ENTRIES) {
+        existing[existing.length - 1].remove();
+        logEntryCount = Math.max(0, logEntryCount - 1);
+        counter.textContent = logEntryCount;
+      }
+
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${isUp ? 'up' : 'down'}`;
+
+      entry.innerHTML = `
+        <div class="log-accent"></div>
+        <div class="log-content">
+          <div class="log-top">
+            <span class="log-service">${escHtml(svc.name)}</span>
+            <span class="log-time">${escHtml(timeStr)}</span>
+          </div>
+          <div class="log-mid">
+            <span class="log-group-tag" style="color:${meta.color}">${escHtml(meta.name)}</span>
+            <div class="log-sep-dot"></div>
+            <span class="log-direction">${isUp ? '↑ came up' : '↓ went down'}</span>
+          </div>
+          <div class="log-host">${escHtml(svc.node)}:${svc.port}</div>
+        </div>
+      `;
+
+      // Insert newest at top
+      body.insertBefore(entry, body.firstChild);
+    }
+
+    function clearLog() {
+      const body  = document.getElementById('log-body');
+      const counter = document.getElementById('log-count');
+      body.innerHTML = '<div class="log-empty" id="log-empty">Monitoring for changes…</div>';
+      logEntryCount = 0;
+      counter.textContent = 0;
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    document.getElementById('log-clear').addEventListener('click', clearLog);
+
     // ── Handle incoming WebSocket status message ──────────────────────────────
     function handleStatus(msg) {
-      lastGroups = msg.groups;
       document.getElementById('loading').classList.add('hidden');
       updateHeaderStats(msg.timestamp, msg.groups);
+
+      // Detect changes before updating prevStatusMap (done inside detectAndLogChanges)
+      if (prevStatusMap.size > 0) {
+        detectAndLogChanges(msg.groups, msg.timestamp);
+      } else {
+        // First message: seed prevStatusMap without logging
+        Object.entries(msg.groups).forEach(([gName, svcs]) => {
+          svcs.forEach(svc => prevStatusMap.set(`${gName}:${svc.name}`, svc.available));
+        });
+      }
+
+      lastGroups = msg.groups;
 
       if (!rendered) {
         currentGraph = buildGraph(msg.groups);
@@ -882,14 +1160,14 @@
       ws.onerror = () => ws.close();
     }
 
-    // ── Resize: re-centre cenbo, nudge simulation ──────────────────────────────
+    // ── Resize handler ────────────────────────────────────────────────────────
     let resizeTimer;
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        const main = document.querySelector('main');
-        W = main.clientWidth;
-        H = main.clientHeight;
+        const graphArea = document.getElementById('graph-area');
+        W = graphArea.clientWidth;
+        H = graphArea.clientHeight;
         svg.attr('width', W).attr('height', H);
         svg.select('rect').attr('width', W).attr('height', H);
         if (currentGraph) {
