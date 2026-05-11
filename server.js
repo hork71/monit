@@ -5,6 +5,12 @@ const http = require('http');
 const WebSocket = require('ws');
 const net = require('net');
 const path = require('path');
+const fs = require('fs');
+
+const LOG_FILE = path.join(__dirname, 'status-changes.log');
+
+// Maps `${group}:${name}` → boolean (last known availability)
+const prevStatus = new Map();
 
 const app = express();
 const server = http.createServer(app);
@@ -77,6 +83,39 @@ async function checkAllServices() {
   return { timestamp: new Date().toISOString(), groups };
 }
 
+/**
+ * Compare current check results against the previous snapshot.
+ * Append any state transitions to the log file as NDJSON lines.
+ * @param {{timestamp: string, groups: Record<string, Array>}} snapshot
+ */
+function detectAndLogChanges({ timestamp, groups }) {
+  const lines = [];
+
+  Object.entries(groups).forEach(([group, services]) => {
+    services.forEach(({ name, node, port, available }) => {
+      const key  = `${group}:${name}`;
+      const prev = prevStatus.get(key);
+
+      if (prev !== undefined && prev !== available) {
+        const entry = { timestamp, group, service: name, node, port, from: prev, to: available };
+        lines.push(JSON.stringify(entry));
+        console.log(
+          `[${timestamp}] ${group}:${name} (${node}:${port}) ` +
+          `${prev ? 'UP' : 'DOWN'} → ${available ? 'UP' : 'DOWN'}`
+        );
+      }
+
+      prevStatus.set(key, available);
+    });
+  });
+
+  if (lines.length > 0) {
+    fs.appendFile(LOG_FILE, lines.join('\n') + '\n', (err) => {
+      if (err) console.error('Failed to write status log:', err.message);
+    });
+  }
+}
+
 let currentStatus = null;
 
 function broadcast(payload) {
@@ -88,6 +127,7 @@ function broadcast(payload) {
 
 async function runChecks() {
   currentStatus = await checkAllServices();
+  detectAndLogChanges(currentStatus);
   broadcast({ type: 'status', ...currentStatus });
 }
 
