@@ -16,6 +16,26 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+/**
+ * Return the last 500 status-change log entries as a JSON array (oldest first).
+ * Returns an empty array if the log file does not yet exist.
+ */
+app.get('/api/log', (req, res) => {
+  fs.readFile(LOG_FILE, 'utf8', (err, data) => {
+    if (err) {
+      if (err.code === 'ENOENT') return res.json([]);
+      return res.status(500).json({ error: err.message });
+    }
+    const entries = data
+      .split('\n')
+      .filter(line => line.trim())
+      .map(line => { try { return JSON.parse(line); } catch (_) { return null; } })
+      .filter(Boolean);
+    // Return only the most recent 500 to keep payload small
+    res.json(entries.slice(-500));
+  });
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const SERVICES = {

@@ -1044,7 +1044,7 @@
       });
     }
 
-    function appendLogEntry(gName, svc, isUp, timeStr) {
+    function appendLogEntry(gName, svc, isUp, timeStr, historical = false) {
       const body   = document.getElementById('log-body');
       const empty  = document.getElementById('log-empty');
       const counter = document.getElementById('log-count');
@@ -1065,6 +1065,7 @@
 
       const entry = document.createElement('div');
       entry.className = `log-entry ${isUp ? 'up' : 'down'}`;
+      if (historical) entry.style.animation = 'none';
 
       entry.innerHTML = `
         <div class="log-accent"></div>
@@ -1084,6 +1085,21 @@
 
       // Insert newest at top
       body.insertBefore(entry, body.firstChild);
+    }
+
+    async function loadHistoricalLog() {
+      try {
+        const res = await fetch('/api/log');
+        if (!res.ok) return;
+        const entries = await res.json();
+        // File is oldest-first; prepending in that order leaves newest at top
+        entries.forEach(({ group, service, node, port, to, timestamp }) => {
+          const timeStr = new Date(timestamp).toTimeString().slice(0, 8);
+          appendLogEntry(group, { name: service, node, port }, to, timeStr, true);
+        });
+      } catch (e) {
+        console.error('Failed to load historical log:', e);
+      }
     }
 
     function clearLog() {
@@ -1181,8 +1197,9 @@
     });
 
     // ── Boot ──────────────────────────────────────────────────────────────────
-    document.fonts.ready.then(() => {
+    document.fonts.ready.then(async () => {
       initSVG();
+      await loadHistoricalLog();
       connect();
     });
   </script>
