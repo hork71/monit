@@ -711,6 +711,11 @@
     const svcHaloRefs    = new Map();
     const groupBadgeRefs = new Map();
 
+    // ── Collapse state ───────────────────────────────────────────────────────
+    const collapsedGroups    = new Set();   // group IDs currently collapsed
+    const groupCircleRefs    = new Map();   // groupId → main circle d3 selection
+    const groupIndicatorRefs = new Map();   // groupId → chevron text d3 selection
+
     // ── Event log state ──────────────────────────────────────────────────────
     // Maps serviceId → last known available state for delta detection
     const prevStatusMap = new Map();
@@ -751,7 +756,9 @@
         .on('drag', (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
         .on('end', (ev, d) => {
           if (!ev.active) sim.alphaTarget(0);
-          if (d.type !== 'root') { d.fx = null; d.fy = null; }
+          // Keep pinned if root, or if this is a collapsed group node
+          const keepPinned = d.type === 'root' || collapsedGroups.has(d.id);
+          if (!keepPinned) { d.fx = null; d.fy = null; }
         });
     }
 
@@ -760,6 +767,9 @@
       svcCircleRefs.clear();
       svcHaloRefs.clear();
       groupBadgeRefs.clear();
+      groupCircleRefs.clear();
+      groupIndicatorRefs.clear();
+      collapsedGroups.clear();
       cenboPingEl = null;
       graphLayer.selectAll('*').remove();
 
@@ -831,17 +841,24 @@
       // ── GROUP nodes ───────────────────────────────────────────────────────
       const groupG = nodeSel.filter(d => d.type === 'group');
 
+      // Click-to-collapse behaviour
+      groupG
+        .style('cursor', 'pointer')
+        .on('click', (ev, d) => { ev.stopPropagation(); toggleGroup(d.id); });
+
       groupG.append('circle')
         .attr('r', R.group + 8)
         .attr('fill', d => d.meta.color + '18')
         .attr('stroke', 'none');
 
-      groupG.append('circle')
+      const groupCircles = groupG.append('circle')
         .attr('r', R.group)
         .attr('fill', d => d.meta.fill)
         .attr('stroke', d => d.meta.color)
         .attr('stroke-width', 2.5)
         .attr('filter', 'url(#node-shadow)');
+
+      groupCircles.each(function(d) { groupCircleRefs.set(d.id, d3.select(this)); });
 
       groupG.append('text')
         .attr('y', -5)
@@ -868,6 +885,20 @@
         .text('—');
 
       countTexts.each(function(d) { groupBadgeRefs.set(d.id, d3.select(this)); });
+
+      // Collapse chevron indicator (▾ = expanded, ▸ = collapsed)
+      const chevrons = groupG.append('text')
+        .attr('y', 20)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'central')
+        .attr('font-family', "'JetBrains Mono', monospace")
+        .attr('font-size', 8)
+        .attr('fill', d => d.meta.color)
+        .attr('opacity', 0.40)
+        .attr('pointer-events', 'none')
+        .text('▾');
+
+      chevrons.each(function(d) { groupIndicatorRefs.set(d.id, d3.select(this)); });
 
       // ── SERVICE nodes ─────────────────────────────────────────────────────
       const svcG = nodeSel.filter(d => d.type === 'service');
@@ -943,6 +974,15 @@
 
     // ── Tick: clamp nodes to graph area bounds ────────────────────────────────
     function ticked() {
+      // Anchor collapsed service nodes to their group's live position each tick
+      collapsedGroups.forEach(groupId => {
+        const g = currentGraph?.nodeMap.get(groupId);
+        if (!g) return;
+        currentGraph.nodes
+          .filter(n => n.type === 'service' && n.group === groupId)
+          .forEach(n => { n.fx = g.x; n.fy = g.y; });
+      });
+
       currentGraph?.nodes.forEach(n => {
         const r = nodeRadius(n) + 5;
         n.x = Math.max(r, Math.min(W - r, n.x));
@@ -967,6 +1007,61 @@
       Object.entries(counts).forEach(([g, c]) => {
         groupBadgeRefs.get(g)?.text(`${c.up}/${c.total}`);
       });
+    }
+
+    // ── Collapse / expand a group node ───────────────────────────────────────
+    function toggleGroup(groupId) {
+      const collapsed = !collapsedGroups.has(groupId);
+      if (collapsed) collapsedGroups.add(groupId);
+      else           collapsedGroups.delete(groupId);
+      applyCollapsedState(groupId, collapsed);
+    }
+
+    /**
+     * Show or hide all service nodes and links belonging to a group.
+     * Collapsed service nodes are pinned (fx/fy) at the group center so the
+     * simulation keeps them there; they are released on expand.
+     * @param {string}  groupId
+     * @param {boolean} collapsed
+     */
+    function applyCollapsedState(groupId, collapsed) {
+      const groupNode = currentGraph?.nodeMap.get(groupId);
+      if (!groupNode) return;
+
+      // Pin the group node itself in place when collapsed, release when expanded
+      if (collapsed) { groupNode.fx = groupNode.x; groupNode.fy = groupNode.y; }
+      else           { groupNode.fx = null; groupNode.fy = null; }
+
+      // Pin/unpin service nodes in the simulation
+      currentGraph.nodes
+        .filter(n => n.type === 'service' && n.group === groupId)
+        .forEach(n => {
+          if (collapsed) { n.fx = groupNode.x; n.fy = groupNode.y; }
+          else           { n.fx = null; n.fy = null; }
+        });
+
+      // Fade service node DOM elements in/out
+      nodeSel
+        .filter(d => d.type === 'service' && d.group === groupId)
+        .transition().duration(280).ease(d3.easeCubicInOut)
+        .attr('opacity', collapsed ? 0 : 1)
+        .style('pointer-events', collapsed ? 'none' : null);
+
+      // Fade group-service links in/out
+      linkSel
+        .filter(d => d.linkType === 'group-service' && d.source.id === groupId)
+        .transition().duration(280)
+        .attr('opacity', collapsed ? 0 : 1);
+
+      // Dashed border when collapsed, solid when expanded
+      groupCircleRefs.get(groupId)
+        ?.attr('stroke-dasharray', collapsed ? '5 3' : null);
+
+      // Update chevron indicator
+      groupIndicatorRefs.get(groupId)?.text(collapsed ? '▸' : '▾');
+
+      // Nudge simulation to re-settle after expanding
+      if (!collapsed) simulation?.alpha(0.25).restart();
     }
 
     // ── Incremental color + badge update ─────────────────────────────────────
