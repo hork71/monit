@@ -4,6 +4,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const net = require('net');
+const dgram = require('dgram');
 const path = require('path');
 const fs = require('fs');
 
@@ -40,46 +41,82 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const SERVICES = {
   puppet: [
-    { name: 'puppetserver', node: 'localhost', port: 8140 },
-    { name: 'puppetdb', node: 'localhost', port: 8081 },
-    { name: 'consoleweb', node: 'example1.com', port: 4430 },
-    { name: 'nodeclassifier', node: 'example1.com', port: 4433 },
-    { name: 'nginx', node: 'localhost', port: 443 },
-    { name: 'orchestration1', node: 'example2.com', port: 8142 },
-    { name: 'orchestration2', node: 'example2.com', port: 8143 },
-    { name: 'postgresql', node: 'localhost', port: 5432 },
+    { name: 'puppetserver',   node: 'localhost',    port: 8140, protocol: 'TCP' },
+    { name: 'puppetdb',       node: 'localhost',    port: 8081, protocol: 'TCP' },
+    { name: 'consoleweb',     node: 'example1.com', port: 4430, protocol: 'TCP' },
+    { name: 'nodeclassifier', node: 'example1.com', port: 4433, protocol: 'TCP' },
+    { name: 'nginx',          node: 'localhost',    port: 443,  protocol: 'TCP' },
+    { name: 'orchestration1', node: 'example2.com', port: 8142, protocol: 'TCP' },
+    { name: 'orchestration2', node: 'example2.com', port: 8143, protocol: 'TCP' },
+    { name: 'postgresql',     node: 'localhost',    port: 5432, protocol: 'TCP' },
   ],
   gitlab: [
-    { name: 'postgresql', node: 'localhost', port: 5432 },
-    { name: 'gitlabrails', node: 'example1.com', port: 443 },
-    { name: 'puma', node: 'localhost', port: 8080 },
-    { name: 'redis', node: 'localhost', port: 6379 },
+    { name: 'postgresql',  node: 'localhost',    port: 5432, protocol: 'TCP' },
+    { name: 'gitlabrails', node: 'example1.com', port: 443,  protocol: 'TCP' },
+    { name: 'puma',        node: 'localhost',    port: 8080, protocol: 'TCP' },
+    { name: 'redis',       node: 'localhost',    port: 6379, protocol: 'TCP' },
   ],
   suma: [
-    { name: 'postgresql', node: 'localhost', port: 5432 },
-    { name: 'ssh', node: 'suma.com', port: 22 },
-    { name: 'gitlabrails', node: 'localhost', port: 443 },
-    { name: 'salt', node: 'suma.com', port: 8080 },
-    { name: 'redis', node: 'suma.com', port: 6379 },
+    { name: 'postgresql',  node: 'localhost', port: 5432, protocol: 'TCP' },
+    { name: 'ssh',         node: 'suma.com',  port: 22,   protocol: 'TCP' },
+    { name: 'gitlabrails', node: 'localhost', port: 443,  protocol: 'TCP' },
+    { name: 'salt',        node: 'suma.com',  port: 8080, protocol: 'TCP' },
+    { name: 'redis',       node: 'suma.com',  port: 6379, protocol: 'TCP' },
   ],
 };
 
 /**
- * Attempt a TCP connection to determine if a port is open on a given host.
- * Resolves true on connect, false on timeout or error.
+ * TCP reachability check: resolve true on connect, false on timeout or error.
  * @param {string} host
  * @param {number} port
  * @returns {Promise<boolean>}
  */
-function checkPort(host, port) {
+function checkTCP(host, port) {
   return new Promise((resolve) => {
     const socket = new net.Socket();
     socket.setTimeout(2000);
     socket.connect(port, host);
     socket.on('connect', () => { socket.destroy(); resolve(true); });
     socket.on('timeout', () => { socket.destroy(); resolve(false); });
-    socket.on('error', () => { socket.destroy(); resolve(false); });
+    socket.on('error',   () => { socket.destroy(); resolve(false); });
   });
+}
+
+/**
+ * UDP reachability check: send an empty datagram and wait 2 s.
+ * An ICMP port-unreachable reply triggers an error event → false.
+ * Silence within the timeout is treated optimistically as true.
+ * @param {string} host
+ * @param {number} port
+ * @returns {Promise<boolean>}
+ */
+function checkUDP(host, port) {
+  return new Promise((resolve) => {
+    const socket = dgram.createSocket('udp4');
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      try { socket.close(); } catch (_) {}
+      resolve(result);
+    };
+    const timer = setTimeout(() => finish(true), 2000);
+    socket.on('error', () => { clearTimeout(timer); finish(false); });
+    socket.send(Buffer.alloc(0), port, host, (err) => {
+      if (err) { clearTimeout(timer); finish(false); }
+    });
+  });
+}
+
+/**
+ * Dispatch to the correct protocol checker.
+ * @param {string} host
+ * @param {number} port
+ * @param {'TCP'|'UDP'} protocol
+ * @returns {Promise<boolean>}
+ */
+function checkService(host, port, protocol) {
+  return protocol === 'UDP' ? checkUDP(host, port) : checkTCP(host, port);
 }
 
 /**
@@ -91,11 +128,12 @@ async function checkAllServices() {
   await Promise.all(
     Object.entries(SERVICES).map(async ([group, services]) => {
       groups[group] = await Promise.all(
-        services.map(async ({ name, node, port }) => ({
+        services.map(async ({ name, node, port, protocol }) => ({
           name,
           node,
           port,
-          available: await checkPort(node, port),
+          protocol,
+          available: await checkService(node, port, protocol),
         }))
       );
     })

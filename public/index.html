@@ -667,7 +667,7 @@
 
         services.forEach(svc => {
           const id = `${gName}:${svc.name}`;
-          nodes.push({ id, type: 'service', group: gName, meta, ...svc });
+          nodes.push({ id, type: 'service', group: gName, meta, protocol: svc.protocol ?? 'TCP', ...svc });
           links.push({ source: gName, target: id, linkType: 'group-service', groupColor: meta.color });
         });
       });
@@ -914,7 +914,7 @@
         .attr('font-size', 8)
         .attr('fill', '#7a93a8')
         .attr('pointer-events', 'none')
-        .text(d => `:${d.port}`);
+        .text(d => `${d.protocol ?? 'TCP'}:${d.port}`);
 
       svcG
         .on('mouseenter', (ev, d) => {
@@ -926,7 +926,7 @@
           grpEl.textContent  = meta.name;
           grpEl.style.color  = meta.color;
           document.getElementById('tt-node').textContent  = d.node;
-          document.getElementById('tt-port').textContent  = `TCP :${d.port}`;
+          document.getElementById('tt-port').textContent  = `${d.protocol ?? 'TCP'} :${d.port}`;
           const st = document.getElementById('tt-status');
           st.textContent = av ? '● ONLINE' : '● OFFLINE';
           st.className   = `tt-status ${av ? 'up' : 'down'}`;
