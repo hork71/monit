@@ -989,9 +989,18 @@
         n.y = Math.max(r, Math.min(H - r, n.y));
       });
 
-      linkSel
-        .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+      linkSel.each(function(d) {
+        const dx   = d.target.x - d.source.x;
+        const dy   = d.target.y - d.source.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const nx   = dx / dist;
+        const ny   = dy / dist;
+        d3.select(this)
+          .attr('x1', d.source.x + nx * nodeRadius(d.source))
+          .attr('y1', d.source.y + ny * nodeRadius(d.source))
+          .attr('x2', d.target.x - nx * nodeRadius(d.target))
+          .attr('y2', d.target.y - ny * nodeRadius(d.target));
+      });
 
       nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
     }
