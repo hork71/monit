@@ -168,6 +168,29 @@
 
     @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 
+    .logout-btn {
+      border: 1px solid var(--border);
+      background: none;
+      border-radius: 3px;
+      padding: 4px 10px;
+      font-family: var(--font-mono);
+      font-size: 8px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: color 0.14s, border-color 0.14s, background 0.14s;
+    }
+
+    .logout-btn:hover {
+      color: var(--red);
+      border-color: rgba(212,36,58,0.30);
+      background: rgba(212,36,58,0.05);
+    }
+
+    .logout-btn:focus-visible { outline: 2px solid var(--puppet); outline-offset: 2px; }
+
     /* ── Main layout ─────────────────────────────────────────────────────────── */
 
     main {
@@ -569,6 +592,8 @@
         <div class="conn-dot" id="conn-dot"></div>
         <span id="conn-label">connecting</span>
       </div>
+      <div class="hdivider"></div>
+      <button class="logout-btn" id="logout-btn">Sign out</button>
     </div>
   </header>
 
@@ -1194,6 +1219,7 @@
     async function loadHistoricalLog() {
       try {
         const res = await fetch('/api/log');
+        if (res.status === 401) { window.location.href = '/login'; return; }
         if (!res.ok) return;
         const entries = await res.json();
         // File is oldest-first; prepending in that order leaves newest at top
@@ -1271,7 +1297,9 @@
         } catch (_) {}
       };
 
-      ws.onclose = () => {
+      ws.onclose = (ev) => {
+        // 1008 = Policy Violation — server rejected unauthenticated connection
+        if (ev.code === 1008) { window.location.href = '/login'; return; }
         document.getElementById('conn-dot').classList.add('off');
         document.getElementById('conn-label').textContent = 'reconnecting';
         reconnTimer = setTimeout(connect, 3000);
@@ -1301,6 +1329,11 @@
     });
 
     // ── Boot ──────────────────────────────────────────────────────────────────
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      await fetch('/auth/logout', { method: 'POST' });
+      window.location.href = '/login';
+    });
+
     document.fonts.ready.then(async () => {
       initSVG();
       await loadHistoricalLog();
