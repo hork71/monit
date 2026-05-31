@@ -651,27 +651,39 @@
       return GROUP_META[id] || { color: '#4a6080', fill: 'rgba(74,96,128,0.09)', name: id.toUpperCase() };
     }
 
-    const R = { root: 44, group: 30, service: 19 };
+    const R = { root: 44, group: 30, nodehost: 22, service: 16 };
     function nodeRadius(d) { return R[d.type] ?? R.service; }
 
     // ── Build D3 graph data from WebSocket status groups ─────────────────────
+    // groups shape: { groupName: { nodeName: [ { name, node, port, protocol, available } ] } }
     function buildGraph(groups) {
-      const nodes = [{ id: 'cenbo', type: 'root' }];
-      const links = [];
-      const nodeMap = new Map();
+      const rootNode    = [{ id: 'cenbo', type: 'root' }];
+      const groupNodes  = [];
+      const nhNodes     = [];
+      const svcNodes    = [];
+      const links       = [];
+      const nodeMap     = new Map();
 
-      Object.entries(groups).forEach(([gName, services]) => {
+      Object.entries(groups).forEach(([gName, gNodes]) => {
         const meta = getGroupMeta(gName);
-        nodes.push({ id: gName, type: 'group', meta, label: meta.name });
+        groupNodes.push({ id: gName, type: 'group', meta, label: meta.name });
         links.push({ source: 'cenbo', target: gName, linkType: 'root-group' });
 
-        services.forEach(svc => {
-          const id = `${gName}:${svc.name}`;
-          nodes.push({ id, type: 'service', group: gName, meta, protocol: svc.protocol ?? 'TCP', ...svc });
-          links.push({ source: gName, target: id, linkType: 'group-service', groupColor: meta.color });
+        Object.entries(gNodes).forEach(([nodeName, services]) => {
+          const nhId = `${gName}:${nodeName}`;
+          nhNodes.push({ id: nhId, type: 'nodehost', group: gName, meta, nodeName });
+          links.push({ source: gName, target: nhId, linkType: 'group-node', groupColor: meta.color });
+
+          services.forEach(svc => {
+            const id = `${gName}:${nodeName}:${svc.name}`;
+            svcNodes.push({ id, type: 'service', group: gName, nodehost: nhId, meta,
+                            protocol: svc.protocol ?? 'TCP', ...svc });
+            links.push({ source: nhId, target: id, linkType: 'node-service', groupColor: meta.color });
+          });
         });
       });
 
+      const nodes = [...rootNode, ...groupNodes, ...nhNodes, ...svcNodes];
       nodes.forEach(n => nodeMap.set(n.id, n));
       return { nodes, links, nodeMap };
     }
@@ -685,15 +697,22 @@
       const groups = graph.nodes.filter(n => n.type === 'group');
       groups.forEach((g, i) => {
         const angle = (i / groups.length) * 2 * Math.PI - Math.PI / 2;
-        g.x = W / 2 + Math.cos(angle) * 190;
-        g.y = H / 2 + Math.sin(angle) * 190;
+        g.x = W / 2 + Math.cos(angle) * 215;
+        g.y = H / 2 + Math.sin(angle) * 215;
+      });
+
+      graph.nodes.filter(n => n.type === 'nodehost').forEach(n => {
+        const g = graph.nodeMap.get(n.group);
+        const angle = Math.random() * 2 * Math.PI;
+        n.x = (g?.x ?? W / 2) + Math.cos(angle) * 120;
+        n.y = (g?.y ?? H / 2) + Math.sin(angle) * 120;
       });
 
       graph.nodes.filter(n => n.type === 'service').forEach(n => {
-        const g = graph.nodeMap.get(n.group);
+        const nh = graph.nodeMap.get(n.nodehost);
         const angle = Math.random() * 2 * Math.PI;
-        n.x = (g?.x ?? W / 2) + Math.cos(angle) * 95;
-        n.y = (g?.y ?? H / 2) + Math.sin(angle) * 95;
+        n.x = (nh?.x ?? W / 2) + Math.cos(angle) * 75;
+        n.y = (nh?.y ?? H / 2) + Math.sin(angle) * 75;
       });
     }
 
@@ -707,14 +726,18 @@
 
     let linkSel, nodeSel;
     let cenboPingEl = null;
-    const svcCircleRefs  = new Map();
-    const svcHaloRefs    = new Map();
-    const groupBadgeRefs = new Map();
+    const svcCircleRefs     = new Map();
+    const svcHaloRefs       = new Map();
+    const groupBadgeRefs    = new Map();
+    const nodehostBadgeRefs = new Map();
 
     // ── Collapse state ───────────────────────────────────────────────────────
-    const collapsedGroups    = new Set();   // group IDs currently collapsed
-    const groupCircleRefs    = new Map();   // groupId → main circle d3 selection
-    const groupIndicatorRefs = new Map();   // groupId → chevron text d3 selection
+    const collapsedGroups       = new Set();
+    const groupCircleRefs       = new Map();
+    const groupIndicatorRefs    = new Map();
+    const collapsedNodehosts    = new Set();
+    const nodehostCircleRefs    = new Map();
+    const nodehostIndicatorRefs = new Map();
 
     // ── Event log state ──────────────────────────────────────────────────────
     // Maps serviceId → last known available state for delta detection
@@ -756,8 +779,9 @@
         .on('drag', (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
         .on('end', (ev, d) => {
           if (!ev.active) sim.alphaTarget(0);
-          // Keep pinned if root, or if this is a collapsed group node
-          const keepPinned = d.type === 'root' || collapsedGroups.has(d.id);
+          const keepPinned = d.type === 'root'
+            || collapsedGroups.has(d.id)
+            || collapsedNodehosts.has(d.id);
           if (!keepPinned) { d.fx = null; d.fy = null; }
         });
     }
@@ -767,9 +791,13 @@
       svcCircleRefs.clear();
       svcHaloRefs.clear();
       groupBadgeRefs.clear();
+      nodehostBadgeRefs.clear();
       groupCircleRefs.clear();
       groupIndicatorRefs.clear();
+      nodehostCircleRefs.clear();
+      nodehostIndicatorRefs.clear();
       collapsedGroups.clear();
+      collapsedNodehosts.clear();
       cenboPingEl = null;
       graphLayer.selectAll('*').remove();
 
@@ -778,13 +806,21 @@
       simulation = d3.forceSimulation(graph.nodes)
         .force('link', d3.forceLink(graph.links)
           .id(d => d.id)
-          .distance(d => d.linkType === 'root-group' ? 185 : 105)
-          .strength(d => d.linkType === 'root-group' ? 0.45 : 0.75))
+          .distance(d => {
+            if (d.linkType === 'root-group') return 220;
+            if (d.linkType === 'group-node') return 140;
+            return 90;
+          })
+          .strength(d => {
+            if (d.linkType === 'root-group') return 0.45;
+            if (d.linkType === 'group-node') return 0.60;
+            return 0.75;
+          }))
         .force('charge', d3.forceManyBody()
-          .strength(d => ({ root: -700, group: -440, service: -175 }[d.type] ?? -175)))
+          .strength(d => ({ root: -700, group: -500, nodehost: -280, service: -130 }[d.type] ?? -130)))
         .force('center', d3.forceCenter(W / 2, H / 2).strength(0.04))
         .force('collide', d3.forceCollide()
-          .radius(d => nodeRadius(d) + 22).strength(0.88))
+          .radius(d => nodeRadius(d) + 18).strength(0.88))
         .alphaDecay(0.013)
         .on('tick', ticked);
 
@@ -792,11 +828,16 @@
         .selectAll('line')
         .data(graph.links)
         .enter().append('line')
-        .attr('stroke', d =>
-          d.linkType === 'root-group'
-            ? 'rgba(38,52,68,0.13)'
-            : d.groupColor + '42')
-        .attr('stroke-width', d => d.linkType === 'root-group' ? 1.5 : 1)
+        .attr('stroke', d => {
+          if (d.linkType === 'root-group') return 'rgba(38,52,68,0.13)';
+          if (d.linkType === 'group-node') return d.groupColor + '55';
+          return d.groupColor + '35';
+        })
+        .attr('stroke-width', d => {
+          if (d.linkType === 'root-group') return 1.5;
+          if (d.linkType === 'group-node') return 1.2;
+          return 0.9;
+        })
         .attr('stroke-linecap', 'round');
 
       nodeSel = graphLayer.append('g')
@@ -900,9 +941,91 @@
 
       chevrons.each(function(d) { groupIndicatorRefs.set(d.id, d3.select(this)); });
 
+      const tooltip = document.getElementById('tooltip');
+
+      // ── NODEHOST nodes ────────────────────────────────────────────────────
+      const nhG = nodeSel.filter(d => d.type === 'nodehost');
+
+      nhG
+        .style('cursor', 'pointer')
+        .on('click', (ev, d) => { ev.stopPropagation(); toggleNodehost(d.id); });
+
+      nhG.append('circle')
+        .attr('r', R.nodehost + 5)
+        .attr('fill', d => d.meta.color + '12')
+        .attr('stroke', 'none');
+
+      const nhCircles = nhG.append('circle')
+        .attr('r', R.nodehost)
+        .attr('fill', d => d.meta.fill)
+        .attr('stroke', d => d.meta.color + 'aa')
+        .attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', '4 2')
+        .attr('filter', 'url(#node-shadow)');
+
+      nhCircles.each(function(d) { nodehostCircleRefs.set(d.id, d3.select(this)); });
+
+      nhG.append('text')
+        .attr('y', -3)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'central')
+        .attr('font-family', "'JetBrains Mono', monospace")
+        .attr('font-size', 5.5)
+        .attr('font-weight', '600')
+        .attr('fill', d => d.meta.color)
+        .attr('pointer-events', 'none')
+        .text(d => d.nodeName);
+
+      const nhBadges = nhG.append('text')
+        .attr('y', 7)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'central')
+        .attr('font-family', "'JetBrains Mono', monospace")
+        .attr('font-size', 6.5)
+        .attr('font-weight', '600')
+        .attr('fill', d => d.meta.color)
+        .attr('opacity', 0.50)
+        .attr('pointer-events', 'none')
+        .text('—');
+
+      nhBadges.each(function(d) { nodehostBadgeRefs.set(d.id, d3.select(this)); });
+
+      const nhChevrons = nhG.append('text')
+        .attr('y', R.nodehost + 10)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'central')
+        .attr('font-family', "'JetBrains Mono', monospace")
+        .attr('font-size', 7)
+        .attr('fill', d => d.meta.color)
+        .attr('opacity', 0.38)
+        .attr('pointer-events', 'none')
+        .text('▾');
+
+      nhChevrons.each(function(d) { nodehostIndicatorRefs.set(d.id, d3.select(this)); });
+
+      nhG
+        .on('mouseenter', (ev, d) => {
+          const meta = getGroupMeta(d.group);
+          document.getElementById('tt-name').textContent = d.nodeName;
+          const grpEl = document.getElementById('tt-group');
+          grpEl.textContent = meta.name; grpEl.style.color = meta.color;
+          document.getElementById('tt-node').textContent = '';
+          document.getElementById('tt-port').textContent = '';
+          const services = currentGraph?.nodes.filter(n => n.type === 'service' && n.nodehost === d.id) ?? [];
+          const upCount  = services.filter(n => n.available).length;
+          const st = document.getElementById('tt-status');
+          st.textContent = `${upCount} / ${services.length} services`;
+          st.className   = `tt-status ${upCount === services.length ? 'up' : 'down'}`;
+          tooltip.classList.add('show');
+        })
+        .on('mousemove', ev => {
+          tooltip.style.left = `${ev.clientX + 16}px`;
+          tooltip.style.top  = `${ev.clientY - 12}px`;
+        })
+        .on('mouseleave', () => tooltip.classList.remove('show'));
+
       // ── SERVICE nodes ─────────────────────────────────────────────────────
       const svcG = nodeSel.filter(d => d.type === 'service');
-      const tooltip = document.getElementById('tooltip');
 
       const halos = svcG.append('circle')
         .attr('r', R.service + 6)
@@ -928,10 +1051,10 @@
         .attr('pointer-events', 'none');
 
       svcG.append('text')
-        .attr('y', R.service + 13)
+        .attr('y', R.service + 12)
         .attr('text-anchor', 'middle')
         .attr('font-family', "'JetBrains Mono', monospace")
-        .attr('font-size', 9.5)
+        .attr('font-size', 9)
         .attr('font-weight', '500')
         .attr('fill', '#263444')
         .attr('opacity', 0.72)
@@ -939,10 +1062,10 @@
         .text(d => d.name);
 
       svcG.append('text')
-        .attr('y', R.service + 24)
+        .attr('y', R.service + 22)
         .attr('text-anchor', 'middle')
         .attr('font-family', "'JetBrains Mono', monospace")
-        .attr('font-size', 8)
+        .attr('font-size', 7.5)
         .attr('fill', '#7a93a8')
         .attr('pointer-events', 'none')
         .text(d => `${d.protocol ?? 'TCP'}:${d.port}`);
@@ -970,17 +1093,27 @@
         .on('mouseleave', () => tooltip.classList.remove('show'));
 
       refreshGroupBadges(graph);
+      refreshNodehostBadges(graph);
     }
 
     // ── Tick: clamp nodes to graph area bounds ────────────────────────────────
     function ticked() {
-      // Anchor collapsed service nodes to their group's live position each tick
+      // Anchor all descendants of collapsed groups to group center each tick
       collapsedGroups.forEach(groupId => {
         const g = currentGraph?.nodeMap.get(groupId);
         if (!g) return;
         currentGraph.nodes
-          .filter(n => n.type === 'service' && n.group === groupId)
+          .filter(n => (n.type === 'nodehost' || n.type === 'service') && n.group === groupId)
           .forEach(n => { n.fx = g.x; n.fy = g.y; });
+      });
+
+      // Anchor service nodes under collapsed nodehosts (when parent group is expanded)
+      collapsedNodehosts.forEach(nhId => {
+        const nh = currentGraph?.nodeMap.get(nhId);
+        if (!nh || collapsedGroups.has(nh.group)) return;
+        currentGraph.nodes
+          .filter(n => n.type === 'service' && n.nodehost === nhId)
+          .forEach(n => { n.fx = nh.x; n.fy = nh.y; });
       });
 
       currentGraph?.nodes.forEach(n => {
@@ -1005,7 +1138,7 @@
       nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
     }
 
-    // ── Group badge counts ────────────────────────────────────────────────────
+    // ── Group / nodehost badge counts ─────────────────────────────────────────
     function refreshGroupBadges(graph) {
       const counts = {};
       graph.nodes.filter(n => n.type === 'service').forEach(n => {
@@ -1018,6 +1151,18 @@
       });
     }
 
+    function refreshNodehostBadges(graph) {
+      const counts = {};
+      graph.nodes.filter(n => n.type === 'service').forEach(n => {
+        if (!counts[n.nodehost]) counts[n.nodehost] = { up: 0, total: 0 };
+        counts[n.nodehost].total++;
+        if (n.available) counts[n.nodehost].up++;
+      });
+      Object.entries(counts).forEach(([nhId, c]) => {
+        nodehostBadgeRefs.get(nhId)?.text(`${c.up}/${c.total}`);
+      });
+    }
+
     // ── Collapse / expand a group node ───────────────────────────────────────
     function toggleGroup(groupId) {
       const collapsed = !collapsedGroups.has(groupId);
@@ -1026,86 +1171,159 @@
       applyCollapsedState(groupId, collapsed);
     }
 
-    /**
-     * Show or hide all service nodes and links belonging to a group.
-     * Collapsed service nodes are pinned (fx/fy) at the group center so the
-     * simulation keeps them there; they are released on expand.
-     * @param {string}  groupId
-     * @param {boolean} collapsed
-     */
     function applyCollapsedState(groupId, collapsed) {
       const groupNode = currentGraph?.nodeMap.get(groupId);
       if (!groupNode) return;
 
-      // Pin the group node itself in place when collapsed, release when expanded
-      if (collapsed) { groupNode.fx = groupNode.x; groupNode.fy = groupNode.y; }
-      else           { groupNode.fx = null; groupNode.fy = null; }
+      if (collapsed) {
+        groupNode.fx = groupNode.x; groupNode.fy = groupNode.y;
 
-      // Pin/unpin service nodes in the simulation
+        // Pin all descendants at group center
+        currentGraph.nodes
+          .filter(n => (n.type === 'nodehost' || n.type === 'service') && n.group === groupId)
+          .forEach(n => { n.fx = groupNode.x; n.fy = groupNode.y; });
+
+        // Hide nodehosts + services
+        nodeSel.filter(d => (d.type === 'nodehost' || d.type === 'service') && d.group === groupId)
+          .transition().duration(280).ease(d3.easeCubicInOut)
+          .attr('opacity', 0).style('pointer-events', 'none');
+
+        // Hide group-node and node-service links
+        linkSel.filter(d => {
+          const src = typeof d.source === 'object' ? d.source.id : d.source;
+          if (d.linkType === 'group-node' && src === groupId) return true;
+          if (d.linkType === 'node-service') {
+            return currentGraph.nodeMap.get(src)?.group === groupId;
+          }
+          return false;
+        }).transition().duration(280).attr('opacity', 0);
+
+      } else {
+        groupNode.fx = null; groupNode.fy = null;
+
+        // Release nodehost nodes
+        currentGraph.nodes
+          .filter(n => n.type === 'nodehost' && n.group === groupId)
+          .forEach(n => { n.fx = null; n.fy = null; });
+
+        // Release service nodes (unless their nodehost is independently collapsed)
+        currentGraph.nodes
+          .filter(n => n.type === 'service' && n.group === groupId)
+          .forEach(n => {
+            if (collapsedNodehosts.has(n.nodehost)) {
+              const nh = currentGraph.nodeMap.get(n.nodehost);
+              if (nh) { n.fx = nh.x; n.fy = nh.y; }
+            } else {
+              n.fx = null; n.fy = null;
+            }
+          });
+
+        // Show nodehosts
+        nodeSel.filter(d => d.type === 'nodehost' && d.group === groupId)
+          .transition().duration(280).ease(d3.easeCubicInOut)
+          .attr('opacity', 1).style('pointer-events', null);
+
+        // Show services (except those under a collapsed nodehost)
+        nodeSel.filter(d => d.type === 'service' && d.group === groupId)
+          .transition().duration(280).ease(d3.easeCubicInOut)
+          .attr('opacity', d => collapsedNodehosts.has(d.nodehost) ? 0 : 1)
+          .style('pointer-events', d => collapsedNodehosts.has(d.nodehost) ? 'none' : null);
+
+        // Show group-node links
+        linkSel.filter(d => d.linkType === 'group-node' &&
+                            (typeof d.source === 'object' ? d.source.id : d.source) === groupId)
+          .transition().duration(280).attr('opacity', 1);
+
+        // Show node-service links for non-collapsed nodehosts
+        linkSel.filter(d => {
+          if (d.linkType !== 'node-service') return false;
+          const src = typeof d.source === 'object' ? d.source.id : d.source;
+          const nh  = currentGraph.nodeMap.get(src);
+          return nh?.group === groupId && !collapsedNodehosts.has(src);
+        }).transition().duration(280).attr('opacity', 1);
+
+        simulation?.alpha(0.25).restart();
+      }
+
+      groupCircleRefs.get(groupId)?.attr('stroke-dasharray', collapsed ? '5 3' : null);
+      groupIndicatorRefs.get(groupId)?.text(collapsed ? '▸' : '▾');
+    }
+
+    // ── Nodehost collapse ─────────────────────────────────────────────────────
+    function toggleNodehost(nhId) {
+      const collapsed = !collapsedNodehosts.has(nhId);
+      if (collapsed) collapsedNodehosts.add(nhId);
+      else           collapsedNodehosts.delete(nhId);
+      applyNodehostCollapsedState(nhId, collapsed);
+    }
+
+    function applyNodehostCollapsedState(nhId, collapsed) {
+      const nhNode = currentGraph?.nodeMap.get(nhId);
+      if (!nhNode) return;
+
+      if (collapsed) { nhNode.fx = nhNode.x; nhNode.fy = nhNode.y; }
+      else           { nhNode.fx = null; nhNode.fy = null; }
+
       currentGraph.nodes
-        .filter(n => n.type === 'service' && n.group === groupId)
+        .filter(n => n.type === 'service' && n.nodehost === nhId)
         .forEach(n => {
-          if (collapsed) { n.fx = groupNode.x; n.fy = groupNode.y; }
+          if (collapsed) { n.fx = nhNode.x; n.fy = nhNode.y; }
           else           { n.fx = null; n.fy = null; }
         });
 
-      // Fade service node DOM elements in/out
-      nodeSel
-        .filter(d => d.type === 'service' && d.group === groupId)
+      nodeSel.filter(d => d.type === 'service' && d.nodehost === nhId)
         .transition().duration(280).ease(d3.easeCubicInOut)
         .attr('opacity', collapsed ? 0 : 1)
         .style('pointer-events', collapsed ? 'none' : null);
 
-      // Fade group-service links in/out
-      linkSel
-        .filter(d => d.linkType === 'group-service' && d.source.id === groupId)
-        .transition().duration(280)
-        .attr('opacity', collapsed ? 0 : 1);
+      linkSel.filter(d => d.linkType === 'node-service' &&
+                          (typeof d.source === 'object' ? d.source.id : d.source) === nhId)
+        .transition().duration(280).attr('opacity', collapsed ? 0 : 1);
 
-      // Dashed border when collapsed, solid when expanded
-      groupCircleRefs.get(groupId)
-        ?.attr('stroke-dasharray', collapsed ? '5 3' : null);
+      nodehostCircleRefs.get(nhId)?.attr('stroke-dasharray', collapsed ? '5 3' : '4 2');
+      nodehostIndicatorRefs.get(nhId)?.text(collapsed ? '▸' : '▾');
 
-      // Update chevron indicator
-      groupIndicatorRefs.get(groupId)?.text(collapsed ? '▸' : '▾');
-
-      // Nudge simulation to re-settle after expanding
       if (!collapsed) simulation?.alpha(0.25).restart();
     }
 
     // ── Incremental color + badge update ─────────────────────────────────────
     function updateColors(groups) {
-      const counts = {};
+      const groupCounts = {};
 
-      Object.entries(groups).forEach(([gName, svcs]) => {
-        counts[gName] = { up: 0, total: svcs.length };
+      Object.entries(groups).forEach(([gName, gNodes]) => {
+        groupCounts[gName] = { up: 0, total: 0 };
 
-        svcs.forEach(({ name, available }) => {
-          const id       = `${gName}:${name}`;
-          const nodeData = currentGraph?.nodeMap.get(id);
-          if (nodeData) nodeData.available = available;
-          if (available) counts[gName].up++;
+        Object.entries(gNodes).forEach(([nodeName, services]) => {
+          services.forEach(({ name, available }) => {
+            const id       = `${gName}:${nodeName}:${name}`;
+            const nodeData = currentGraph?.nodeMap.get(id);
+            if (nodeData) nodeData.available = available;
+            groupCounts[gName].total++;
+            if (available) groupCounts[gName].up++;
 
-          const circle = svcCircleRefs.get(id);
-          if (circle) {
-            circle
-              .classed('unavail-pulse', !available)
-              .transition().duration(500)
-              .attr('fill',   available ? COLORS.greenFill : COLORS.redFill)
-              .attr('stroke', available ? COLORS.green     : COLORS.red);
-          }
+            const circle = svcCircleRefs.get(id);
+            if (circle) {
+              circle
+                .classed('unavail-pulse', !available)
+                .transition().duration(500)
+                .attr('fill',   available ? COLORS.greenFill : COLORS.redFill)
+                .attr('stroke', available ? COLORS.green     : COLORS.red);
+            }
 
-          const halo = svcHaloRefs.get(id);
-          if (halo) {
-            halo.transition().duration(500)
-              .attr('fill', available ? COLORS.greenHalo : COLORS.redHalo);
-          }
+            const halo = svcHaloRefs.get(id);
+            if (halo) {
+              halo.transition().duration(500)
+                .attr('fill', available ? COLORS.greenHalo : COLORS.redHalo);
+            }
+          });
         });
       });
 
-      Object.entries(counts).forEach(([g, c]) => {
+      Object.entries(groupCounts).forEach(([g, c]) => {
         groupBadgeRefs.get(g)?.text(`${c.up}/${c.total}`);
       });
+
+      if (currentGraph) refreshNodehostBadges(currentGraph);
 
       if (cenboPingEl) {
         cenboPingEl
@@ -1117,10 +1335,13 @@
 
     // ── Header stat counters ──────────────────────────────────────────────────
     function updateHeaderStats(timestamp, groups) {
-      Object.entries(groups).forEach(([g, svcs]) => {
-        const up = svcs.filter(s => s.available).length;
+      Object.entries(groups).forEach(([g, gNodes]) => {
+        let up = 0, total = 0;
+        Object.values(gNodes).forEach(services => {
+          services.forEach(s => { total++; if (s.available) up++; });
+        });
         const el = document.getElementById(`${g}-count`);
-        if (el) el.textContent = `${up} / ${svcs.length}`;
+        if (el) el.textContent = `${up} / ${total}`;
       });
       const t = new Date(timestamp);
       document.getElementById('last-check').textContent = t.toTimeString().slice(0, 8);
@@ -1132,14 +1353,16 @@
       const timeStr = time.toTimeString().slice(0, 8);
       const changes = [];
 
-      Object.entries(groups).forEach(([gName, svcs]) => {
-        svcs.forEach(svc => {
-          const id   = `${gName}:${svc.name}`;
-          const prev = prevStatusMap.get(id);
-          if (prev !== undefined && prev !== svc.available) {
-            changes.push({ id, gName, svc, available: svc.available, timeStr });
-          }
-          prevStatusMap.set(id, svc.available);
+      Object.entries(groups).forEach(([gName, gNodes]) => {
+        Object.entries(gNodes).forEach(([nodeName, services]) => {
+          services.forEach(svc => {
+            const id   = `${gName}:${nodeName}:${svc.name}`;
+            const prev = prevStatusMap.get(id);
+            if (prev !== undefined && prev !== svc.available) {
+              changes.push({ id, gName, svc, available: svc.available, timeStr });
+            }
+            prevStatusMap.set(id, svc.available);
+          });
         });
       });
 
@@ -1234,8 +1457,11 @@
         detectAndLogChanges(msg.groups, msg.timestamp);
       } else {
         // First message: seed prevStatusMap without logging
-        Object.entries(msg.groups).forEach(([gName, svcs]) => {
-          svcs.forEach(svc => prevStatusMap.set(`${gName}:${svc.name}`, svc.available));
+        Object.entries(msg.groups).forEach(([gName, gNodes]) => {
+          Object.entries(gNodes).forEach(([nodeName, services]) => {
+            services.forEach(svc =>
+              prevStatusMap.set(`${gName}:${nodeName}:${svc.name}`, svc.available));
+          });
         });
       }
 

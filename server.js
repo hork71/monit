@@ -10,7 +10,7 @@ const fs = require('fs');
 
 const LOG_FILE = path.join(__dirname, 'status-changes.log');
 
-// Maps `${group}:${name}` → boolean (last known availability)
+// Maps `${group}:${nodeName}:${name}` → boolean (last known availability)
 const prevStatus = new Map();
 
 const app = express();
@@ -39,30 +39,45 @@ app.get('/api/log', (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Structure: { group: { nodeName: [ { name, node, port, protocol } ] } }
 const SERVICES = {
-  puppet: [
-    { name: 'puppetserver',   node: 'localhost',    port: 8140, protocol: 'TCP' },
-    { name: 'puppetdb',       node: 'localhost',    port: 8081, protocol: 'TCP' },
-    { name: 'consoleweb',     node: 'example1.com', port: 4430, protocol: 'TCP' },
-    { name: 'nodeclassifier', node: 'example1.com', port: 4433, protocol: 'TCP' },
-    { name: 'nginx',          node: 'localhost',    port: 443,  protocol: 'TCP' },
-    { name: 'orchestration1', node: 'example2.com', port: 8142, protocol: 'TCP' },
-    { name: 'orchestration2', node: 'example2.com', port: 8143, protocol: 'TCP' },
-    { name: 'postgresql',     node: 'localhost',    port: 5432, protocol: 'TCP' },
-  ],
-  gitlab: [
-    { name: 'postgresql',  node: 'localhost',    port: 5432, protocol: 'TCP' },
-    { name: 'gitlabrails', node: 'example1.com', port: 443,  protocol: 'TCP' },
-    { name: 'puma',        node: 'localhost',    port: 8080, protocol: 'TCP' },
-    { name: 'redis',       node: 'localhost',    port: 6379, protocol: 'TCP' },
-  ],
-  suma: [
-    { name: 'postgresql',  node: 'localhost', port: 5432, protocol: 'TCP' },
-    { name: 'ssh',         node: 'suma.com',  port: 22,   protocol: 'TCP' },
-    { name: 'gitlabrails', node: 'localhost', port: 443,  protocol: 'TCP' },
-    { name: 'salt',        node: 'suma.com',  port: 8080, protocol: 'TCP' },
-    { name: 'redis',       node: 'suma.com',  port: 6379, protocol: 'TCP' },
-  ],
+  puppet: {
+    'localhost': [
+      { name: 'puppetserver', node: 'localhost', port: 8140, protocol: 'TCP' },
+      { name: 'puppetdb',     node: 'localhost', port: 8081, protocol: 'TCP' },
+      { name: 'nginx',        node: 'localhost', port: 443,  protocol: 'TCP' },
+      { name: 'postgresql',   node: 'localhost', port: 5432, protocol: 'TCP' },
+    ],
+    'example1.com': [
+      { name: 'consoleweb',     node: 'example1.com', port: 4430, protocol: 'TCP' },
+      { name: 'nodeclassifier', node: 'example1.com', port: 4433, protocol: 'TCP' },
+    ],
+    'example2.com': [
+      { name: 'orchestration1', node: 'example2.com', port: 8142, protocol: 'TCP' },
+      { name: 'orchestration2', node: 'example2.com', port: 8143, protocol: 'TCP' },
+    ],
+  },
+  gitlab: {
+    'localhost': [
+      { name: 'postgresql', node: 'localhost', port: 5432, protocol: 'TCP' },
+      { name: 'puma',       node: 'localhost', port: 8080, protocol: 'TCP' },
+      { name: 'redis',      node: 'localhost', port: 6379, protocol: 'TCP' },
+    ],
+    'example1.com': [
+      { name: 'gitlabrails', node: 'example1.com', port: 443, protocol: 'TCP' },
+    ],
+  },
+  suma: {
+    'localhost': [
+      { name: 'postgresql',  node: 'localhost', port: 5432, protocol: 'TCP' },
+      { name: 'gitlabrails', node: 'localhost', port: 443,  protocol: 'TCP' },
+    ],
+    'suma.com': [
+      { name: 'ssh',   node: 'suma.com', port: 22,   protocol: 'TCP' },
+      { name: 'salt',  node: 'suma.com', port: 8080, protocol: 'TCP' },
+      { name: 'redis', node: 'suma.com', port: 6379, protocol: 'TCP' },
+    ],
+  },
 };
 
 /**
@@ -126,15 +141,17 @@ function checkService(host, port, protocol) {
 async function checkAllServices() {
   const groups = {};
   await Promise.all(
-    Object.entries(SERVICES).map(async ([group, services]) => {
-      groups[group] = await Promise.all(
-        services.map(async ({ name, node, port, protocol }) => ({
-          name,
-          node,
-          port,
-          protocol,
-          available: await checkService(node, port, protocol),
-        }))
+    Object.entries(SERVICES).map(async ([group, nodes]) => {
+      groups[group] = {};
+      await Promise.all(
+        Object.entries(nodes).map(async ([nodeName, services]) => {
+          groups[group][nodeName] = await Promise.all(
+            services.map(async ({ name, node, port, protocol }) => ({
+              name, node, port, protocol,
+              available: await checkService(node, port, protocol),
+            }))
+          );
+        })
       );
     })
   );
@@ -149,21 +166,23 @@ async function checkAllServices() {
 function detectAndLogChanges({ timestamp, groups }) {
   const lines = [];
 
-  Object.entries(groups).forEach(([group, services]) => {
-    services.forEach(({ name, node, port, available }) => {
-      const key  = `${group}:${name}`;
-      const prev = prevStatus.get(key);
+  Object.entries(groups).forEach(([group, nodes]) => {
+    Object.entries(nodes).forEach(([nodeName, services]) => {
+      services.forEach(({ name, node, port, available }) => {
+        const key  = `${group}:${nodeName}:${name}`;
+        const prev = prevStatus.get(key);
 
-      if (prev !== undefined && prev !== available) {
-        const entry = { timestamp, group, service: name, node, port, from: prev, to: available };
-        lines.push(JSON.stringify(entry));
-        console.log(
-          `[${timestamp}] ${group}:${name} (${node}:${port}) ` +
-          `${prev ? 'UP' : 'DOWN'} → ${available ? 'UP' : 'DOWN'}`
-        );
-      }
+        if (prev !== undefined && prev !== available) {
+          const entry = { timestamp, group, service: name, node, port, from: prev, to: available };
+          lines.push(JSON.stringify(entry));
+          console.log(
+            `[${timestamp}] ${group}:${nodeName}:${name} (${node}:${port}) ` +
+            `${prev ? 'UP' : 'DOWN'} → ${available ? 'UP' : 'DOWN'}`
+          );
+        }
 
-      prevStatus.set(key, available);
+        prevStatus.set(key, available);
+      });
     });
   });
 
